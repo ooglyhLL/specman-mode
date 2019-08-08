@@ -3281,7 +3281,6 @@ Key Bindings:
         ;;normal-auto-fill-function 'specman-do-auto-fill ;; TODO: someday...
         indent-region-function 'specman-indent-region)
 
-  (make-local-variable 'case-fold-search)
   (make-local-variable 'indent-region-function)
   (setq indent-region-function 'specman-indent-region)
   (setq case-fold-search t)
