@@ -1916,7 +1916,13 @@ to context."
 ;; =================================================
 ;; SPECMAN FONTLOCK SUPPORT
 ;; =================================================
-(defvar specman-mode-syntax-table nil
+(defvar specman-mode-syntax-table
+  (let ((table (make-syntax-table)))
+    (specman-populate-syntax-table table)
+
+    ;; add extra comment syntax
+    (specman-setup-dual-comments table)
+    table)
   "Syntax table used in specman-mode buffers.")
 
 (defconst specman-font-lock-keywords nil
@@ -3245,11 +3251,6 @@ Key Bindings:
   (setq mode-name "Specman")
   (setq write-file-hooks nil)
   (setq local-abbrev-table specman-mode-abbrev-table)
-  (setq specman-mode-syntax-table (make-syntax-table))
-  (specman-populate-syntax-table specman-mode-syntax-table)
-
-  ;; add extra comment syntax
-  (specman-setup-dual-comments specman-mode-syntax-table)
   (set-syntax-table specman-mode-syntax-table)
 
   ;; initializations
