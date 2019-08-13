@@ -3218,12 +3218,12 @@ See also `specman-font-lock-extra-types'.")
 ;; SPECMAN MODE - MAIN FUNCTION
 ;; =================================================
 
-(defvar specman-mode-abbrev-table nil
-  "Abbrev table in use in Specman-mode buffers."
-  )
-(define-abbrev-table 'specman-mode-abbrev-table ())
+;; Compatibility workaround
+(eval-and-compile
+  (unless (fboundp 'prog-mode)
+    (define-derived-mode prog-mode fundamental-mode "Prog")))
 
-(defun specman-mode ()
+(define-derived-mode specman-mode prog-mode "Specman"
   "Major mode for editing Specman code.
 
 Automatically indents and colorizes E code.
@@ -3243,15 +3243,7 @@ To tune other user tunable options, enter
 Key Bindings:
 =================================
 \\{specman-mode-map}"
-  (interactive)
-  
-  (kill-all-local-variables)
-  (use-local-map specman-mode-map)
-  (setq major-mode 'specman-mode)
-  (setq mode-name "Specman")
-  (setq write-file-hooks nil)
-  (setq local-abbrev-table specman-mode-abbrev-table)
-  (set-syntax-table specman-mode-syntax-table)
+  :group 'specman-mode
 
   ;; initializations
   (make-local-variable 'parse-sexp-ignore-comments)
@@ -3314,8 +3306,6 @@ Key Bindings:
     (setq imenu-create-index-function 'specman-imenu-create-menu)
     (imenu-add-to-menubar "Specman-Index")
     )
-  
-  (run-hooks 'specman-mode-hook)
   )
 
 ;; =================================================
@@ -5218,7 +5208,7 @@ happens!.
 ;; The major mode function.
 ;;
 
-(defun specman-comment-mode ()
+(define-derived-mode specman-comment-mode text-mode "Specman/Comment"
   "Major mode for editing comments for Specman.
 
 While you are entering a comment for a version, the following
@@ -5240,28 +5230,22 @@ Global user options:
   ;;  (kill-all-local-variables)
   ;;  (set (make-local-variable 'specman-comment-parent-buffer) parent))
 
-  (setq major-mode 'specman-comment-mode)
-  (setq mode-name "Specman/Comment")
-
-  (set-syntax-table text-mode-syntax-table)
-  (use-local-map specman-comment-mode-map)
-  (setq local-abbrev-table text-mode-abbrev-table)
-
   (make-local-variable 'specman-comment-operands)
 
   (set-buffer-modified-p nil)
-  (setq buffer-file-name nil)
-  (run-hooks 'text-mode-hook 'specman-comment-mode-hook))
+  (setq buffer-file-name nil))
 
 ;; -----------------------------------------------------------------------------
 ;; The keymap.
 ;;
 
-(defvar specman-comment-mode-map nil)
-(if specman-comment-mode-map
-    nil
-  (setq specman-comment-mode-map (make-sparse-keymap))
-  (define-key specman-comment-mode-map "\C-c\C-c" 'specman-comment-finish))
+(defconst specman-comment-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map text-mode-map)
+    (define-key map "\C-c\C-c" 'specman-comment-finish)
+    map)
+  "Keymap to be used for editing Specman comments in
+  `specman-comment-mode' buffers.")
 
 ;; -----------------------------------------------------------------------------
 ;; Constants.
