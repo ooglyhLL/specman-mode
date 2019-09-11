@@ -1,23 +1,14 @@
-;; @(#) specman-mode.el -- Mode for editing specman files
-;; @(#) $Id: specman-mode.el,v 1.23 2013/05/23 07:03:00 pouyet Exp $
-;; @(#) $Keywords: tools $
-;; $KnownCompatibility: 23.1+, XEmacs21.4.15+ $
-
 ;; This file is not part of Emacs
-
-
+;;
 ;; Copyright (C) 2013 Cadence Design Systems, Inc.
+;;               2012-2020 Verilab, Inc.
 ;; Authors:      Uri Maoz <urim@cadence.com>
 ;;               Michael McNamara <mac@cadence.com>
 ;;               Yaron Peri <yperi@cadence.com>
-;; Maintainer:   
-;; Created:      May 25 2013
-
-
-;; LCD Archive Entry:
-;; specman-mode|Michael McNamara|mac@verisity.com|
-;; Specman Major mode. auto indents, colorizes, code in the 'e language|
-;; 25-May-2013|$Revision: 1.23 $|~/misc/specman-mode.el.Z|
+;;               Scott Roland <scott.roland@verilab.com>
+;;               Marcus Harnisch <marcus.harnisch@verilab.com>
+;; Maintainer:   Marcus Harnisch <marcus.harnisch@verilab.com>
+;; Created:      Feb 02 2020
 
 ;; COPYRIGHT NOTICE
 ;;
@@ -40,8 +31,6 @@
 ;; SPECMAN MODE - A Major mode for writing in 'e'
 ;; =============================================================================
 ;;
-
-;; ....................................................... &t-install ...
 ;; Put this file on your Emacs-Lisp load path, add following into your
 ;; Emacs initialization file (e.g. ~/.emacs, ~/.emacs.d/init.el):
 ;;  
