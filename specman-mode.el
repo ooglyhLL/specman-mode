@@ -45,17 +45,13 @@
 ;;   specman-mode is a major mode for editing code written in the 'e' language
 ;;
 
-;; Branch 'shr' created by Scott Roland <scott@hackonteur.com>
-;; GitHub home of 'shr' branch: https://github.com/hackonteur/specman-mode
-
-(defconst specman-mode-version "Revision: 1.23 (shr 2)"
+(defconst specman-mode-version "1.24"
   "Version of this Specman mode.")
 
 (defun specman-version ()
   "Inform caller of the version of this file"
   (interactive)
-  (message (concat "Using specman-mode version " 
-                   (substring specman-mode-version 12 -3 )) )
+  (message (concat "Specman Mode " specman-mode-version))
   )
 
 (add-hook 'speedbar-load-hook
