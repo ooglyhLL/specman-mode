@@ -5403,24 +5403,20 @@ the user to edit."
 ;; =============================================================================
 ;; SPECMAN ADAPTIVE AUTO FILL
 ;; =============================================================================
-;; Require package filladapt
+;; `filladapt' provides optional functionality that may be useful when
+;; editing multi-line comments. The package can be installed from
+;; ELPA (Emacs) or as part of the `text-modes' package (XEmacs).
 
-(when (require 'filladapt nil)
-
-  (add-hook 'specman-mode-hook
-            '(lambda () (auto-fill-mode 1)))
-  (add-hook 'specman-mode-hook
-            '(lambda () (filladapt-mode 1)))
-  
-  ; The e comment token in the token table must appeat before the bullet token
+(eval-after-load "filladapt"
+  ; The e comment token in the token table must appear before the bullet token
   ; since the bullet regexp include "-+". That's why we put it in the begining of
   ; the list. The order in the other lists is not important.
   ; C++ style comments are already recognized.
-  (setcar filladapt-token-table '("---*" e-comment))
-  (setcar filladapt-token-match-table '(e-comment e-comment))
-  (setcar filladapt-token-conversion-table '(e-comment . exact))
+  '(progn
+     (setcar filladapt-token-table '("---*" e-comment))
+     (setcar filladapt-token-match-table '(e-comment e-comment))
+     (setcar filladapt-token-conversion-table '(e-comment . exact)))
 )
-
 
 
 ;;; specman-comment mode definition ends here
