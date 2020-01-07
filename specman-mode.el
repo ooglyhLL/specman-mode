@@ -78,19 +78,6 @@
                    (substring specman-mode-version 12 -3 )) )
   )
 
-(autoload 'specman-mode "specman-mode" "Specman code editing mode" t) 
-
-;; remove-duplicates below requires cl
-(require 'cl)
-
-(setq auto-mode-alist 
-      (remove-duplicates
-       (append (list 
-                (cons "\\.e\\'" 'specman-mode)
-                (cons "\\.ecom\\'" 'specman-mode)
-                (cons "\\.erld\\'" 'specman-mode))
-               auto-mode-alist)))
-
 (add-hook 'speedbar-load-hook
           (lambda ()
             (speedbar-add-supported-extension ".e")))
