@@ -91,12 +91,6 @@
                 (cons "\\.erld\\'" 'specman-mode))
                auto-mode-alist)))
 
-(add-hook 'specman-mode-hook
-          (lambda ()
-            (turn-on-font-lock)
-            (setq indent-tabs-mode nil)
-            (setq write-file-hooks nil)))
-
 (add-hook 'speedbar-load-hook
           (lambda ()
             (speedbar-add-supported-extension ".e")))
