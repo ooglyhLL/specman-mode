@@ -43,26 +43,17 @@
 
 ;; ....................................................... &t-install ...
 ;; Put this file on your Emacs-Lisp load path, add following into your
-;; ~/.emacs startup file
-;;
-;;   (require 'specman-mode)
-;;
-;; Or add the following code to your .emacs:
+;; Emacs initialization file (e.g. ~/.emacs, ~/.emacs.d/init.el):
 ;;  
-;; (autoload 'specman-mode "specman-mode" "Specman code editing mode" t) 
+;;   (autoload 'specman-mode "specman-mode" "Specman code editing mode" t)
 ;;
-;; (setq auto-mode-alist 
-;;       (remove-duplicates
-;;        (append (list 
-;;                 (cons "\\.e\\'" 'specman-mode)
-;;                 (cons "\\.ecom\\'" 'specman-mode)
-;;                 (cons "\\.erld\\'" 'specman-mode))
-;;                auto-mode-alist)))
-;; 
+;;   (add-to-list 'auto-mode-alist '("\\.e\\'" . specman-mode))
+;;   (add-to-list 'auto-mode-alist '("\\.ecom\\'" . specman-mode))
+;;   (add-to-list 'auto-mode-alist '("\\.erld\\'" . specman-mode))
 ;;
-;;; Commetary:
+;; Commentary:
 ;;
-;;  specman-mode is a major mode for editing code written in the 'e' language
+;;   specman-mode is a major mode for editing code written in the 'e' language
 ;;
 
 ;; Branch 'shr' created by Scott Roland <scott@hackonteur.com>
