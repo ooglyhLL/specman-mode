@@ -383,29 +383,34 @@ format (e.g. 09/17/1997) is not supported."
 (defconst specman-number-regexp
   (concat
    "\\("
-
-   ;; this is ugly, but the only way I could find to count + and - as
-   ;; number symbols but maintaining that numbers have to come after
-   ;; a symbol beginning
-   "\\(?:"
-   "[+-]"
-   "\\|"
    specman-symbol-begin-regexp
-   "\\)"
-   
    "\\(?:"
-   "[0-9]+"
+   "\\(?:"
+   "0b[01_]+" ;; unsized binary
    "\\|"
-   "0b[01]+"
+   "0o[0-7_]+" ;; unsized octal
    "\\|"
-   "0o[0-7]+"
+   "0x[0-9a-fA-F_]+" ;; unsized hexadecimal
    "\\|"
-   "0[xh][0-9a-fA-F]+"
+   "[0-9]+'[bB][01hHlLnNuUwWxXzZ_]+" ;; sized binary (incl MVL)
+   "\\|"
+   "[0-9]+'[oO][0-7hHlLnNuUwWxXzZ_]+" ;; sized octal (incl MVL)
+   "\\|"
+   "[0-9]+'[xXhH][0-9a-fA-FhHlLnNuUwWxXzZ_]+" ;; sized hexadecimal (incl MVL)
+   "\\|"
+   "[0-9]+'[dD][0-9][0-9_]*" ;; sized decimal
+   "\\|"
+   "-?[0-9_]+\\(?:\\.[0-9_]+\\)?\\(?:[eE][+-]?[0-9]+\\)?" ; real
+   "\\|"
+   "-?[0-9_]+[kKmM]?" ;; unsized decimal (last, so it won't hide other literals)
    "\\)"
-   
-   "[kKmM]?"
+   specman-symbol-end-regexp
    "\\)"
-   specman-symbol-end-regexp)
+   "\\|"
+   ;; match literal character (printable ASCII plus a few escape seqs)
+   "0c\"\\(?:[ -Z^-~]\\|[][]\\|\\\\[fntr\\\"]\\)\""
+   "\\)"
+   )
   "Regexp that identifies numbers (arg1)")
 
 
