@@ -142,10 +142,6 @@
 (if (not (boundp 'imenu-generic-expression))
     (defvar imenu-generic-expression))
 
-(unless (boundp 'font-lock-constant-face)
-  (make-face 'font-lock-constant-face)
-  (set-face-foreground 'font-lock-constant-face "CadetBlue"))
-
 (if (< max-specpdl-size 3000) 
     (setq max-specpdl-size 3000))
 
