@@ -449,16 +449,6 @@ format (e.g. 09/17/1997) is not supported."
 ;; SPECMAN SEARCHES AND QUERIES
 ;; =================================================
 
-(defsubst specman-beg-of-line-pos ()
-  (save-excursion
-    (beginning-of-line)
-    (point)))
-
-(defsubst specman-end-of-line-pos ()
-  (save-excursion
-    (end-of-line)
-    (point)))
-
 (defsubst specman-within-comment-p ()
   (or (specman-within-line-comment-p)
       (specman-within-region-comment-p))
@@ -590,7 +580,7 @@ format (e.g. 09/17/1997) is not supported."
                     ;; NOTE: this approach is more elegant, but slower than the code below
                     ;;(if (specman-within-string-p)
                     ;;    (re-search-backward "[^\\]\"" BOUND 'move)
-                    ;;  (re-search-backward "//\\|--" (specman-beg-of-line-pos) 'move))
+                    ;;  (re-search-backward "//\\|--" (line-beginning-position) 'move))
                     (when (save-match-data
                             (back-to-indentation)
                             (re-search-forward "\\(//\\|--\\)\\|\\([^\\]\"\\)" (match-beginning 2) 'move)
@@ -623,7 +613,7 @@ format (e.g. 09/17/1997) is not supported."
                       ;; if a comment is not found then point is left on the
                       ;; beginning of the line but the goto-char below fixes this.
                       ;; note: the while checks that the comment prefix is not in a string
-                      (while (and (re-search-backward "//\\|--" (specman-beg-of-line-pos) 'move)
+                      (while (and (re-search-backward "//\\|--" (line-beginning-position) 'move)
                                   (if (specman-within-string-p)
                                       t
                                     (progn
@@ -3300,7 +3290,7 @@ Key Bindings:
           (save-excursion
             ;; have to be careful here to prevent finding the end of the current
             ;; statement/action but still not entering any new scope while checking that.
-            (specman-re-search-backward "[;)}]" (specman-beg-of-line-pos) t within-code-region)
+            (specman-re-search-backward "[;)}]" (line-beginning-position) t within-code-region)
             
             (unless (looking-at ";")
               (forward-char))
@@ -3414,7 +3404,7 @@ indentation change."
            )
 
       (unless (zerop shift-amt)
-        (delete-region (specman-beg-of-line-pos)
+        (delete-region (line-beginning-position)
                        (specman-indent-pos))
         (beginning-of-line)
         (indent-to indent))
@@ -3736,7 +3726,7 @@ indentation change."
           )
       (when comment-start
         (goto-char comment-start)
-        (delete-region comment-start (specman-end-of-line-pos))
+        (delete-region comment-start (line-end-position))
         (delete-horizontal-space)
         t))))
 
@@ -3751,7 +3741,7 @@ indentation change."
     (when (and (or skip-scope-closer-check
                    (progn
                      (beginning-of-line)
-                     (specman-re-search-forward "};" (specman-end-of-line-pos) t)))
+                     (specman-re-search-forward "};" (line-end-position) t)))
                (or kill-existing-comment
                    (save-excursion
                      (end-of-line)
@@ -4146,8 +4136,8 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
     (while (< (point)
               end-marker)
       (when (specman-line-within-comment-p)
-        (comment-region (specman-beg-of-line-pos)
-                        (specman-end-of-line-pos)
+        (comment-region (line-beginning-position)
+                        (line-end-position)
                         -2))
       (specman-indent-line)
       (forward-line 1))
@@ -4694,7 +4684,7 @@ as much as possible.  comment style is preserved."
 
   (if (save-excursion
         (beginning-of-line)
-        (not (re-search-forward "[^ \t]" (specman-end-of-line-pos) t)))
+        (not (re-search-forward "[^ \t]" (line-end-position) t)))
 
       ;; warn if empty line
       (message "realign-comment doesn't work on empty lines.")
@@ -4704,10 +4694,10 @@ as much as possible.  comment style is preserved."
             (progn
               (beginning-of-line)
               (or (re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)[^ \t]"
-                                     (specman-end-of-line-pos)
+                                     (line-end-position)
                                      t)
                   (re-search-forward "\\(\\)[^ \t]" ;; the empty match is for buffer-substring
-                                     (specman-end-of-line-pos)
+                                     (line-end-position)
                                      t))
               (buffer-substring (match-beginning 1) (match-end 1)))
             )
@@ -4785,7 +4775,7 @@ style.  returns:
         (forward-char (- comment-column
                          (current-column)))
         (and (looking-at comment-prefix)
-             (if (re-search-backward "[^ \t]" (specman-beg-of-line-pos) t)
+             (if (re-search-backward "[^ \t]" (line-beginning-position) t)
                  'first
                'clean))))))
 
@@ -4823,7 +4813,7 @@ style.  returns:
        (beginning-of-line)
        ;;(re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)[^ \t]"
        (re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)"
-                          (specman-end-of-line-pos)
+                          (line-end-position)
                           nil)
        (setq comment-prefix (buffer-substring (match-beginning 1)
                                               (match-end 1)))
@@ -4836,12 +4826,12 @@ style.  returns:
                                                          comment-prefix)
          (forward-line -1))
        (forward-line)
-       (re-search-forward comment-prefix (specman-end-of-line-pos) nil)
+       (re-search-forward comment-prefix (line-end-position) nil)
        (goto-char (match-beginning 0))
        
        (set-marker beg-marker (point))
        (setq comment-text (buffer-substring (match-end 0)
-                                            (specman-end-of-line-pos)))
+                                            (line-end-position)))
        (end-of-line)
        (set-marker end-marker (point))
        
@@ -4850,13 +4840,13 @@ style.  returns:
            (equal (specman-internal-is-matching-comment-line comment-column
                                                              comment-prefix)
                   'clean)
-         (re-search-forward comment-prefix (specman-end-of-line-pos) nil)
+         (re-search-forward comment-prefix (line-end-position) nil)
          (setq comment-text
                (concat comment-text
                        "\n"
                        (buffer-substring (match-end 0)
-                                         (specman-end-of-line-pos))))
-         (set-marker end-marker (specman-end-of-line-pos))
+                                         (line-end-position))))
+         (set-marker end-marker (line-end-position))
          (forward-line))
        )
      )
