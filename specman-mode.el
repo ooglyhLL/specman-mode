@@ -122,15 +122,6 @@
           (require 'easymenu)
         (error nil))))
 
-;; If you install xemacs-devel, you will get a 10-20% speedup.
-;; if not, you get this:
-(unless (fboundp 'regexp-opt)
-  (defun regexp-opt (strings &optional paren)
-    (let ((open (if paren "\\(" ""))
-          (close (if paren "\\)" ""))
-          )
-      (concat open (mapconcat 'regexp-quote strings "\\|") close))))
-
 (if (featurep 'xemacs)
     (defalias 'specman--char= 'char=) ; XEmacs
   (defalias 'specman--char= '=))      ; FSF Emacs
