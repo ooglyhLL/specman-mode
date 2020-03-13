@@ -1805,14 +1805,14 @@ to context."
          (specman-safe-char= (char-before) ?\  )
          )
         )
-    (delete-backward-char 1)
+    (delete-char -1)
     (if (and (not (specman-within-string-p))
              start-with-space)
         (while (and (not (eq (% (current-column) 
                                 specman-tab-width)
                              0))
                     (specman-safe-char= (char-before) ?\  ))
-          (delete-backward-char 1)))))
+          (delete-char -1)))))
 
 (defun specman-kill-entire-line ()
   "Kill entire line and indent"
@@ -4761,22 +4761,22 @@ method name only, otherwise a full header with comments."
              (looking-at ".*[^ \t]+")
              
              (newline)
-             (previous-line 1)
+             (forward-line -1)
              )
             )
       
       (newline)
-      (previous-line 1)))
+      (forward-line -1)))
 
                                         ;  (insert "<'") (indent-according-to-mode)
                                         ;  (end-of-line) (newline)
                                         ;  (insert "'>") (indent-according-to-mode)
-                                        ;  (previous-line 1) (end-of-line)
+                                        ;  (forward-line -1) (end-of-line)
                                         ;  (specman-insert-newline)
 
   (insert "<'") (newline 4)
   (insert "'>")
-  (previous-line 2)
+  (forward-line -2)
   )
 
 ;; -----------------------------------------------------------------------------
@@ -4794,7 +4794,7 @@ method name only, otherwise a full header with comments."
   (end-of-line) (newline)
   (insert "};") 
   (indent-according-to-mode)
-  (previous-line 1) (end-of-line)
+  (forward-line -1) (end-of-line)
   (specman-insert-newline))
 
 ;; -----------------------------------------------------------------------------
@@ -4811,7 +4811,7 @@ method name only, otherwise a full header with comments."
   (insert "{") (indent-according-to-mode)
   (end-of-line) (newline)
   (insert "};") (indent-according-to-mode)
-  (previous-line 1) (end-of-line)
+  (forward-line -1) (end-of-line)
   (specman-insert-newline))
 
 
@@ -4869,7 +4869,7 @@ as much as possible.  comment style is preserved."
           (progn
             (kill-line)
             (newline)
-            (previous-line 1)
+            (forward-line -1)
             (end-of-line)))
       )))
 
