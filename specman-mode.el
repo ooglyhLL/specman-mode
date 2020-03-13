@@ -5183,8 +5183,6 @@ the value of specman-comment-mode-hook.
 
 Global user options:
 "
-  (interactive)
-
   ;; Major modes are supposed to just (kill-all-local-variables)
   ;; but we rely on specman-comment-parent-buffer already having been set
   ;;
