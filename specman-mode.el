@@ -453,6 +453,50 @@ format (e.g. 09/17/1997) is not supported."
 ;; SPECMAN SEARCHES AND QUERIES
 ;; =================================================
 
+(defsubst specman-beg-of-line-pos ()
+  (save-excursion
+    (beginning-of-line)
+    (point)))
+
+(defsubst specman-end-of-line-pos ()
+  (save-excursion
+    (end-of-line)
+    (point)))
+
+(defsubst specman-within-comment-p ()
+  (or (specman-within-line-comment-p)
+      (specman-within-region-comment-p))
+  )
+
+(defsubst specman-empty-line-p ()
+  (looking-at "^[ \t]*$"))
+
+(defun specman-within-string-p ()
+  (save-excursion
+    (nth 3 (parse-partial-sexp (point-min) (point)))))
+
+(defsubst specman-line-within-string-p ()
+  (save-excursion
+    (beginning-of-line)
+    (specman-within-string-p)))
+
+(defsubst specman-prepared-buffer-substring (beg end)
+  "Remove extra spaces and new-lines from strings."
+  (save-match-data
+    (if (eq specman-emacs-kind 'emacs)
+        (replace-regexp-in-string "[ \t\n]+"
+                                  " "
+                                  (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
+                                                            ""
+                                                            (buffer-substring beg
+                                                                              end)))
+      (replace-in-string (replace-in-string (buffer-substring beg
+                                                              end)
+                                            "^[ \t\n]+\\|[ \t\n]+$"
+                                            "")
+                         "[ \t\n]+"
+                         " "))))
+
 (defsubst specman-re-search-forward (REGEXP BOUND NOERROR &optional within-code-region)
   "Like re-search-forward, but skips over matches in comments or strings"
   (let ((start-pos
@@ -610,50 +654,6 @@ format (e.g. 09/17/1997) is not supported."
                    (match-beginning 0)
                  start-pos))
     (match-beginning 0)))
-
-(defsubst specman-beg-of-line-pos ()
-  (save-excursion
-    (beginning-of-line)
-    (point)))
-
-(defsubst specman-end-of-line-pos ()
-  (save-excursion
-    (end-of-line)
-    (point)))
-
-(defsubst specman-within-comment-p ()
-  (or (specman-within-line-comment-p)
-      (specman-within-region-comment-p))
-  )
-
-(defsubst specman-empty-line-p ()
-  (looking-at "^[ \t]*$"))
-
-(defun specman-within-string-p ()
-  (save-excursion
-    (nth 3 (parse-partial-sexp (point-min) (point)))))
-
-(defsubst specman-line-within-string-p ()
-  (save-excursion
-    (beginning-of-line)
-    (specman-within-string-p)))
-
-(defsubst specman-prepared-buffer-substring (beg end)
-  "Remove extra spaces and new-lines from strings."
-  (save-match-data
-    (if (eq specman-emacs-kind 'emacs)
-        (replace-regexp-in-string "[ \t\n]+"
-                                  " "
-                                  (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
-                                                            ""
-                                                            (buffer-substring beg
-                                                                              end)))
-      (replace-in-string (replace-in-string (buffer-substring beg
-                                                              end)
-                                            "^[ \t\n]+\\|[ \t\n]+$"
-                                            "")
-                         "[ \t\n]+"
-                         " "))))
 
 
 ;; =================================================
