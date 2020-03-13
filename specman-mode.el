@@ -88,11 +88,6 @@
       (condition-case nil
           (require 'func-menu)
         (error nil))
-      (condition-case nil
-          (unless (fboundp 'char=)
-            (defun char= (a b)
-              (= a b)))
-        (error nil))
       (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
           nil ;; We've got what we needed
         ;; We have the old custom-library, hack around it!
@@ -142,10 +137,13 @@
           )
       (concat open (mapconcat 'regexp-quote strings "\\|") close))))
 
-;; TODO: this is also defined above, not sure why
-(unless (fboundp 'char=)
-  (defun char= (a b)
-    (= a b)))
+(if (featurep 'xemacs)
+    (defalias 'specman--char= 'char=) ; XEmacs
+  (defalias 'specman--char= '=))      ; FSF Emacs
+(eval-when-compile
+  ;; Try hard to inline the alias as efficiently as possible
+  ;; (see https://nullprogram.com/blog/2019/12/10/)
+  (put 'specman--char= 'byte-optimizer 'byte-compile-inline-expand))
 
 (if (not (boundp 'imenu-generic-expression))
     (defvar imenu-generic-expression))
@@ -1566,11 +1564,13 @@ supported list, along with the values for this variable:
               (cons (list '<= var final)
                     (append body (list (list 'setq var (list '+ '1 var))))))))
 
-(defun safe-char= (a b)
-  "Safe execution of char= which can accept-nil"
+(defun specman-safe-char= (a b)
+  "Return t if both A and B are equal
+
+The arguments to A and B may be characters or nil."
   (or (and a
            b
-           (char= a b))
+           (specman--char= a b))
       (not (or a
                b))
       )
@@ -1802,7 +1802,7 @@ to context."
   (interactive)
   ;; if we are inside a string, delete one char
   (let ((start-with-space
-         (safe-char= (char-before) ?\  )
+         (specman-safe-char= (char-before) ?\  )
          )
         )
     (delete-backward-char 1)
@@ -1811,7 +1811,7 @@ to context."
         (while (and (not (eq (% (current-column) 
                                 specman-tab-width)
                              0))
-                    (safe-char= (char-before) ?\  ))
+                    (specman-safe-char= (char-before) ?\  ))
           (delete-backward-char 1)))))
 
 (defun specman-kill-entire-line ()
@@ -3594,7 +3594,7 @@ indentation change."
       (cond
 
        (;; Open scope or list
-        (safe-char= (char-after) ?\{)
+        (specman-safe-char= (char-after) ?\{)
 
         (let* ((beg-after-last-termination
                 (save-excursion
@@ -3619,15 +3619,15 @@ indentation change."
                 (goto-char parenloc)
                 (if (save-excursion                        ;; special case:
                       (and (specman-up-list t)             ;; scope within a parens is a
-                           (safe-char= (char-after) ?\())) ;; list argument to a function
+                           (specman-safe-char= (char-after) ?\())) ;; list argument to a function
                     (back-to-indentation)                  ;; so indent according to last line
                   (goto-char (specman-beg-of-statement t)))  ;; normally indent to statement
-                (if (safe-char= c ?\})
+                (if (specman-safe-char= c ?\})
                     (current-column)
                   (+ (current-column) 
                      specman-basic-offset
                      continuing-line-offset)))
-            (if (safe-char= c ?\})            ;; leave at same column as non-comment char
+            (if (specman-safe-char= c ?\})            ;; leave at same column as non-comment char
                 (progn
                   (goto-char parenloc)
                   (current-column))
@@ -3636,7 +3636,7 @@ indentation change."
         )
 
        (;; Inside ( )
-        (safe-char= (char-after) ?\()
+        (specman-safe-char= (char-after) ?\()
 
         (let* ((beg-after-last-termination
                 (save-excursion
@@ -3681,7 +3681,7 @@ indentation change."
                   specman-continued-line-offset))        ;; indent as non-terminated
                )
 
-          (+ (if (safe-char= c ?\))           ;; add offset for non-terminated lines
+          (+ (if (specman-safe-char= c ?\))           ;; add offset for non-terminated lines
                  0                            ;; which are not the closing parens 
                continuing-line-offset)
              (progn
@@ -3693,14 +3693,14 @@ indentation change."
                      (back-to-indentation)
                      (+ (current-column)
                         specman-basic-offset))
-                 (if (safe-char= c ?\))       ;; leave at same column as non-comment char
+                 (if (specman-safe-char= c ?\))       ;; leave at same column as non-comment char
                      (progn
                        (goto-char parenloc)
                        (current-column))
                    (current-column)))))))
 
        (;; Inside [ ]
-        (safe-char= (char-after) ?\[)
+        (specman-safe-char= (char-after) ?\[)
         (progn
           (forward-char 1)
           (skip-chars-forward " \t")     ;; move position to end of whitespace
@@ -3708,12 +3708,12 @@ indentation change."
                   (eolp))                ;; or end-of-line
               (progn                     ;; indent normally
                 (goto-char (specman-beg-of-statement t))
-                (if (safe-char= c ?\])
+                (if (specman-safe-char= c ?\])
                     (current-column)
                   (progn
                     (+ (current-column) 
                        specman-basic-offset))))
-            (if (safe-char= c ?\])       ;; leave at same column as non-comment char
+            (if (specman-safe-char= c ?\])       ;; leave at same column as non-comment char
                 (progn
                   (goto-char parenloc)
                   (current-column))
@@ -3984,7 +3984,7 @@ indentation change."
   (let ((last-char (char-before)))
     (insert ";") ; Don't use last-command-char, cause this function may be called from another function
     (when (and specman-auto-endcomments
-               (safe-char= last-char ?\} )
+               (specman-safe-char= last-char ?\} )
                (not (specman-within-string-p))
                (not (specman-within-comment-p)))
       
