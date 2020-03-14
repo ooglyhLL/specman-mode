@@ -3223,7 +3223,6 @@ Key Bindings:
   (make-local-variable 'comment-start-skip)
   (make-local-variable 'comment-column)
   (make-local-variable 'normal-auto-fill-function)
-  (make-local-variable 'indent-region-function)
   (make-local-variable 'comment-indent-function)
   (setq comment-indent-function 'specman-comment-indent)
   (setq comment-start "// "
@@ -3232,7 +3231,7 @@ Key Bindings:
         comment-column 48
         comment-multi-line t
         ;;normal-auto-fill-function 'specman-do-auto-fill ;; TODO: someday...
-        indent-region-function 'specman-indent-region)
+        )
 
   (make-local-variable 'indent-region-function)
   (setq indent-region-function 'specman-indent-region)
@@ -4141,25 +4140,20 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (specman-indent-line-keep-pos)
   )
 
+(defmacro specman--maybe-delete-selection ()
+  (if (featurep 'xemacs)
+      '(when (and (region-exists-p) pending-delete-mode)
+         (delete-region (region-beginning) (region-end)))
+    '(when delete-selection-mode
+       (delete-active-region))))
+
 (defun specman-yank ()
   "Yank (paste) and indent"
   (interactive)
-  ;; Need this because of bug in emacs: when another function calls
-  ;; yank-clipboard-selection it does not overwrite selected text, but when it
-  ;; is invoked by a key command it does.
-  (if (selection-owner-p)
-      (delete-primary-selection))
-
-  (setq start (line-number))
-  (yank-clipboard-selection)
-  (setq end (line-number))
+  (specman--maybe-delete-selection)
+  (yank)
   (save-excursion
-    (goto-line start)
-    (while (<= (line-number) end)
-      (specman-activate-indent)
-      (forward-line 1))
-    )
-  )
+    (indent-region (mark) (point))))
 
 
 ;; -----------------------------------------------------------------------------
