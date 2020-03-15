@@ -477,19 +477,12 @@ format (e.g. 09/17/1997) is not supported."
 (defsubst specman-prepared-buffer-substring (beg end)
   "Remove extra spaces and new-lines from strings."
   (save-match-data
-    (if (eq specman-emacs-kind 'emacs)
-        (replace-regexp-in-string "[ \t\n]+"
-                                  " "
-                                  (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
-                                                            ""
-                                                            (buffer-substring beg
-                                                                              end)))
-      (replace-in-string (replace-in-string (buffer-substring beg
-                                                              end)
-                                            "^[ \t\n]+\\|[ \t\n]+$"
-                                            "")
-                         "[ \t\n]+"
-                         " "))))
+    (replace-regexp-in-string "[ \t\n]+"
+                              " "
+                              (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
+                                                        ""
+                                                        (buffer-substring beg
+                                                                          end)))))
 
 (defsubst specman-re-search-forward (REGEXP BOUND NOERROR &optional within-code-region)
   "Like re-search-forward, but skips over matches in comments or strings"
@@ -1252,14 +1245,6 @@ supported list, along with the values for this variable:
     ))
   )
 
-(defvar specman-emacs-kind nil)
-
-;; emacs or xemacs
-(if (or (string-match "Lucid" emacs-version)
-        (string-match "XEmacs" emacs-version))
-    (setq specman-emacs-kind 'xemacs)
-  (setq specman-emacs-kind 'emacs))
-
 
 ;; =================================================
 ;; SPECMAN IMENU FEATURE
@@ -1811,9 +1796,9 @@ to context."
 (defun specman-kill-entire-line ()
   "Kill entire line and indent"
   (interactive)
-  (if (eq specman-emacs-kind 'emacs)
-      (kill-whole-line)
-    (kill-entire-line))
+  (if (featurep 'xemacs)
+      (kill-entire-line)
+    (kill-whole-line))
   (specman-activate-indent)
   )
 
