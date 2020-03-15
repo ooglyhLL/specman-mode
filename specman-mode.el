@@ -2792,7 +2792,6 @@ See also `specman-font-lock-extra-types'.")
                                             lim
                                             'move
                                             t))
-          (setq tb (char-syntax (char-before)))
           (cond
            ((match-beginning 1)
             (setq nest (1+ nest))
