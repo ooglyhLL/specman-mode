@@ -2840,7 +2840,7 @@ See also `specman-font-lock-extra-types'.")
 ;; =================================================
 ;; SPECMAN Menus
 ;; =================================================
-(defvar specman-xemacs-menu
+(defvar specman-emacs-menu
   '("Specman"
     ("Move"
      ["Beginning of specification"                      specman-beg-of-defun t]
@@ -2884,12 +2884,11 @@ See also `specman-font-lock-extra-types'.")
   "Emacs menu for SPECMAN mode."
   )
 
-(unless (string-match "XEmacs" emacs-version)
-  (easy-menu-define
-    specman-menu
-    specman-mode-map
-    "Menu for Specman mode"
-    specman-xemacs-menu))
+(easy-menu-define
+  specman-menu
+  specman-mode-map
+  "Menu for Specman mode"
+  specman-emacs-menu)
 
 (defun specman-customize ()
   "Link to customize screen for Specman"
@@ -3103,16 +3102,9 @@ Key Bindings:
         (setq comment-indent-function 'specman-comment-indent))
     (make-local-variable 'comment-indent-function)
     (setq comment-indent-function 'specman-comment-indent))
-  
-  ;; Make a menu bar
-  (if (string-match "XEmacs" emacs-version)
-      (progn
-        (if (and current-menubar
-                 (not (assoc "Specman" current-menubar)))
-            (progn
-              (set-buffer-menubar (copy-sequence current-menubar))
-              (add-submenu nil specman-xemacs-menu))) ))
-  
+
+  (easy-menu-add specman-menu) ;; required for XEmacs, nop on Emacs
+ 
   ;; imenu setup - setup the function that creates the specman index
   (when specman-index-menu-active
     (setq imenu--split-submenus-enable nil)
