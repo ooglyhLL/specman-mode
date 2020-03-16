@@ -5108,7 +5108,7 @@ style.  returns:
   (interactive)
   (let ((reporter-prompt-for-summary-p t))
     (reporter-submit-bug-report
-     "support@cadence.com"
+     "specman-mode@online.de"
      (concat "specman-mode v" (substring specman-mode-version 12 -3))
      '(
        specman-basic-offset
