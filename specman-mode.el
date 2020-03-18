@@ -58,12 +58,6 @@
           (lambda ()
             (speedbar-add-supported-extension ".e")))
 
-(defmacro specman-safe (&rest body)
-  "Safely execute BODY, return nil if an error occurred."
-  `(condition-case nil
-       (progn ,@body)
-     (error nil)))
-
 (if (fboundp 'eval-when-compile)
     (eval-when-compile
       (condition-case nil
