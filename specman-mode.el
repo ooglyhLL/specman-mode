@@ -58,68 +58,9 @@
           (lambda ()
             (speedbar-add-supported-extension ".e")))
 
-(eval-when-compile
-  (condition-case nil
-      (require 'cl)  ;; FSF emacs's imenu needs cl, but doesn't (require 'cl)
-    (error nil))
-  (condition-case nil
-      (require 'imenu)
-    (error nil))
-  (condition-case nil
-      (unless (fboundp 'imenu-add-to-menubar)
-        (defun imenu-add-to-menubar (a) ))
-    (error nil))
-  (condition-case nil
-      (require 'reporter)
-    (error nil))
-  (condition-case nil
-      (if (boundp 'current-menubar)
-          nil ;; great
-        (defmacro set-buffer-menubar (&rest args) nil)
-        (defmacro add-submenu (&rest args) nil))
-    (error nil))
-  (condition-case nil
-      (require 'func-menu)
-    (error nil))
-  (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
-      nil ;; We've got what we needed
-    ;; We have the old custom-library, hack around it!
-    (defmacro defgroup (&rest args)  nil)
-    (defmacro customize (&rest args)
-      (message "Sorry, Customize is not available with this version of emacs"))
-    (defmacro defcustom (var value doc &rest args)
-      `(defvar ,var ,value , doc))
-    )
-  (if (fboundp 'defface)
-      nil ;; great!
-    (defmacro defface (var value doc &rest args)
-      `(make-face ,var))
-    )
-  (if (and (featurep 'custom) (fboundp 'customize-group))
-      nil ;; We've got what we needed
-    ;; We have an intermediate custom-library, hack around it!
-    (defmacro customize-group (var &rest args)
-      `(customize ,var) )
-    )
-  (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
-      nil ;; We've got what we needed
-    ;; We have the old custom-library, hack around it!
-    (defmacro defgroup (&rest args)  nil)
-    (defmacro customize (&rest args)
-      (message "Sorry, Customize is not available with this version of emacs"))
-    (defmacro defcustom (var value doc &rest args)
-      `(defvar ,var ,value , doc))
-    )
-  
-  (if (and (featurep 'custom) (fboundp 'customize-group))
-      nil ;; We've got what we needed
-    ;; We have an intermediate custom-library, hack around it!
-    (defmacro customize-group (var &rest args)
-      `(customize ,var) )
-    )
-  (condition-case nil
-      (require 'easymenu)
-    (error nil)))
+(require 'imenu)
+(require 'reporter)
+(require 'easymenu)
 
 (if (featurep 'xemacs)
     (defalias 'specman--char= 'char=) ; XEmacs
@@ -128,9 +69,6 @@
   ;; Try hard to inline the alias as efficiently as possible
   ;; (see https://nullprogram.com/blog/2019/12/10/)
   (put 'specman--char= 'byte-optimizer 'byte-compile-inline-expand))
-
-(if (not (boundp 'imenu-generic-expression))
-    (defvar imenu-generic-expression))
 
 (if (< max-specpdl-size 3000) 
     (setq max-specpdl-size 3000))
@@ -4940,12 +4878,9 @@ style.  returns:
   (delete-char 1))
 
 
-                                        ;--============================================================================--
+;;============================================================================--
 ;; Bug reporting
-                                        ;--============================================================================--
-
-(require 'reporter)
-
+;;============================================================================--
 (defun specman-submit-bug-report ()
   "Submit via mail a bug report on specman-mode.el"
   (interactive)
