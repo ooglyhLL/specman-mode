@@ -1087,108 +1087,6 @@ have an updating cost and the index itself to nil."
 ;; SPECMAN SYNTAX TABLE
 ;; =================================================
 
-(defconst specman-emacs-features
-  (let ((major (and (boundp 'emacs-major-version)
-                    emacs-major-version))
-        (minor (and (boundp 'emacs-minor-version)
-                    emacs-minor-version))
-        flavor comments )
-    ;; figure out version numbers if not already discovered
-    (and (or (not major) (not minor))
-         (string-match "\\([0-9]+\\).\\([0-9]+\\)" emacs-version)
-         (setq major (string-to-int (substring emacs-version
-                                               (match-beginning 1)
-                                               (match-end 1)))
-               minor (string-to-int (substring emacs-version
-                                               (match-beginning 2)
-                                               (match-end 2)))))
-    (if (not (and major minor))
-        (error "Cannot figure out the major and minor version numbers."))
-    ;; calculate the major version
-    (cond
-     ((= major 4)  (setq major 'v18))   ;Epoch 4
-     ((= major 18) (setq major 'v18))   ;Emacs 18
-     ((= major 19) (setq major 'v19     ;Emacs 19
-                         flavor (if (or (string-match "Lucid" emacs-version)
-                                        (string-match "XEmacs" emacs-version))
-                                    'XEmacs 'FSF)))
-     ((> major 19) (setq major 'v20
-                         flavor (if (or (string-match "Lucid" emacs-version)
-                                        (string-match "XEmacs" emacs-version))
-                                    'XEmacs 'FSF)))
-     ;; I don't know
-     (t (error "Cannot recognize major version number: %s" major)))
-    ;; XEmacs 19 uses 8-bit modify-syntax-entry flags, as do all
-    ;; patched Emacs 19, Emacs 18, Epoch 4's.  Only Emacs 19 uses a
-    ;; 1-bit flag.  Let's be as smart as we can about figuring this
-    ;; out.
-    (if (or (eq major 'v20) (eq major 'v19))
-        (let ((table (copy-syntax-table)))
-          (modify-syntax-entry ?a ". 12345678" table)
-          (cond
-           ;; XEmacs pre 20 and Emacs pre 19.30 use vectors for syntax tables.
-           ((vectorp table)
-            (if (= (logand (lsh (aref table ?a) -16) 255) 255)
-                (setq comments '8-bit)
-              (setq comments '1-bit)))
-           ;; XEmacs 20 is known to be 8-bit
-           ((eq flavor 'XEmacs) (setq comments '8-bit))
-           ;; Emacs 19.30 and beyond are known to be 1-bit
-           ((eq flavor 'FSF) (setq comments '1-bit))
-           ;; Don't know what this is
-           (t (error "Couldn't figure out syntax table format."))
-           ))
-      ;; Emacs 18 has no support for dual comments
-      (setq comments 'no-dual-comments))
-    ;; lets do some minimal sanity checking.
-    (if (or
-         ;; Lemacs before 19.6 had bugs
-         (and (eq major 'v19) (eq flavor 'XEmacs) (< minor 6))
-         ;; Emacs 19 before 19.21 has known bugs
-         (and (eq major 'v19) (eq flavor 'FSF) (< minor 21))
-         )
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "The version of Emacs that you are running, %s,
-has known bugs in its syntax parsing routines which will affect the
-performance of specman-mode. You should strongly consider upgrading to the
-latest available version.  Specman-mode may continue to work, after a
-fashion, but strange indentation errors could be encountered."
-                  emacs-version))))
-    ;; Emacs 18, with no patch is not too good
-    (if (and (eq major 'v18) (eq comments 'no-dual-comments))
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "The version of Emacs 18 you are running, %s,
-has known deficiencies in its ability to handle the dual specman
-comments, [e.g. the // and -- comments]. You really should strongly
-consider upgrading to one of the latest Emacs 19\'s.  In Emacs 18, you
-may also experience performance degradations.  Emacs 19 has some new
-built-in routines which will speed things up for you.  Because of
-these inherent problems, specman-mode is not supported on emacs-18."
-                  emacs-version))))
-    ;; Emacs 18 with the syntax patches are no longer supported
-    (if (and (eq major 'v18) (not (eq comments 'no-dual-comments)))
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "You are running a syntax patched Emacs 18 variant.  While this should
-work for you, you may want to consider upgrading to Emacs 19.
-The syntax patches are no longer supported either for specman-mode."))))
-    (list major comments ))
-  "A list of features extant in the Emacs you are using.
-There are many flavors of Emacs out there, each with different
-features supporting those needed by specman-mode.  Here's the current
-supported list, along with the values for this variable:
-
- Vanilla Emacs 18/Epoch 4:   (v18 no-dual-comments flock-syntax-before-1930)
- Emacs 18/Epoch 4 (patch2):  (v18 8-bit flock-syntax-after-1930)
- XEmacs (formerly Lucid) 19: (v19 8-bit flock-syntax-after-1930)
- XEmacs >= 20:               (v20 8-bit flock-syntax-after-1930)
- Emacs 19.1-19.30:           (v19 8-bit flock-syntax-before-1930)
- Emacs 19.31-19.xx:          (v19 8-bit flock-syntax-after-1930)
- Emacs >=20:                 (v20 1-bit flock-syntax-after-1930)."
-  )
-
 (defun specman-populate-syntax-table (table)
   (modify-syntax-entry ?_  "w"        table)  ;; underscore is a part of words
   (modify-syntax-entry ?{  "(}"       table)
@@ -1216,33 +1114,31 @@ supported list, along with the values for this variable:
   ;; instead, the second comment style /*...*/ is used, although
   ;; it is only a valid syntax in the context of c routines.
   
-  (cond
-   ((memq '8-bit specman-emacs-features)
-    ;; XEmacs (formerly Lucid) has the best implementation
-    
-    ;;    (modify-syntax-entry ?/  ". 12" table)
-    ;;    (modify-syntax-entry ?-  ". 56" table)
-    ;;    (modify-syntax-entry ?\n "> 37" table)
-    ;;    (modify-syntax-entry ?\f "> 37" table)
-    (modify-syntax-entry ?/  ". 1258" table)
-    (modify-syntax-entry ?*  ". 67" table)
-    (modify-syntax-entry ?\n "> 3" table)
-    (modify-syntax-entry ?\f "> 3" table)
-    )
-   ((memq '1-bit specman-emacs-features)
-    ;; Emacs 19 does things differently, but we can work with it
-    
-    ;;    (modify-syntax-entry ?/  ". 12" table)
-    ;;    (modify-syntax-entry ?\n ">"    table)
-    ;;    (modify-syntax-entry ?\f ">"    table)
-    ;;    (modify-syntax-entry ?-  "< 12b" table)
-    ;;    (modify-syntax-entry ?\n "> b"    table)
-    ;;    (modify-syntax-entry ?\f "> b"    table)
-    (modify-syntax-entry ?/  ". 124" table)
-    (modify-syntax-entry ?*  ". 23b" table)
-    (modify-syntax-entry ?\n ">"    table)
-    (modify-syntax-entry ?\f ">"    table)
-    ))
+  (if (featurep 'xemacs)
+      ;; XEmacs has the best implementation
+      (progn
+        ;;    (modify-syntax-entry ?/  ". 12" table)
+        ;;    (modify-syntax-entry ?-  ". 56" table)
+        ;;    (modify-syntax-entry ?\n "> 37" table)
+        ;;    (modify-syntax-entry ?\f "> 37" table)
+        (modify-syntax-entry ?/  ". 1258" table)
+        (modify-syntax-entry ?*  ". 67" table)
+        (modify-syntax-entry ?\n "> 3" table)
+        (modify-syntax-entry ?\f "> 3" table)
+        )
+    ;; Emacs does things differently, but we can work with it
+    (progn
+      ;;    (modify-syntax-entry ?/  ". 12" table)
+      ;;    (modify-syntax-entry ?\n ">"    table)
+      ;;    (modify-syntax-entry ?\f ">"    table)
+      ;;    (modify-syntax-entry ?-  "< 12b" table)
+      ;;    (modify-syntax-entry ?\n "> b"    table)
+      ;;    (modify-syntax-entry ?\f "> b"    table)
+      (modify-syntax-entry ?/  ". 124" table)
+      (modify-syntax-entry ?*  ". 23b" table)
+      (modify-syntax-entry ?\n ">"    table)
+      (modify-syntax-entry ?\f ">"    table)
+      ))
   )
 
 
