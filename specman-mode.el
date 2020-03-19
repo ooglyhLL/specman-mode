@@ -1338,23 +1338,6 @@ have an updating cost and the index itself to nil."
 ;; SPECMAN UTILITY
 ;; =================================================
 
-;; Macros
-(defmacro inc (num &optional val) 
-  "increment the value of num"
-  (setq num (+ num (or val 1))))
-
-(defmacro for (var from init to final do &rest body)
-  "Execute a simple \"for\" loop, e.g.,
-    (for i from 1 to 10 do (print i))."
-  ;;  '(let ((,var ,init))
-  ;;     (while (<= ,var ,final)
-  ;;       ,(append body
-  ;;                (setq ,var (+ 1 ,var))))))
-  (list 'let (list (list var init))
-        (cons 'while 
-              (cons (list '<= var final)
-                    (append body (list (list 'setq var (list '+ '1 var))))))))
-
 (defun specman-safe-char= (a b)
   "Return t if both A and B are equal
 
@@ -3938,6 +3921,19 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (save-excursion
     (indent-region (mark) (point))))
 
+(defun specman-insert-and-indent-to (str col)
+  "Insert string STR at point and indent each inserted line to COL."
+  (let ((beg (point)))
+    (insert str)
+    (let ((end (point-marker)))
+      ;; Note that END position will change during loop execution as
+      ;; lines are indented. Hence a marker, not just point.
+      (goto-char beg)
+      (beginning-of-line)
+      (while (< (point) end)
+        (indent-to col)
+        (forward-line))
+      (goto-char end))))
 
 ;; -----------------------------------------------------------------------------
 ;;  Scope Queries
@@ -4231,14 +4227,9 @@ the struct/define name only, otherwise a full header with comments."
             (if compact-header
                 (progn
                   (indent-to-left-margin)
-                  (insert "\
+                  (specman-insert-and-indent-to "\
 --  <struct>
-")
-
-                  (forward-line -2)
-                  (for i from 1 to 2 do (progn
-                                          (forward-line)
-                                          (indent-to header-indent)))
+" header-indent)
                   (specman-major-comment-separator)
                   (goto-char start)
                   (search-forward "<struct>")
@@ -4246,15 +4237,11 @@ the struct/define name only, otherwise a full header with comments."
                   (end-of-line))
               (progn
                 (indent-to-left-margin)
-                (insert "\
+                (specman-insert-and-indent-to "\
 --  Struct      :  <struct>
 --  Description :  <description>
 --  Note        :  <note>
-")
-                (forward-line -4)
-                (for i from 1 to 4 do (progn
-                                        (forward-line)
-                                        (indent-to header-indent)))
+" header-indent)
                 (specman-major-comment-separator)
                 (goto-char start)
                 (search-forward "<struct>")
@@ -4376,13 +4363,9 @@ method name only, otherwise a full header with comments."
             (if compact-header
                 (progn
                   (indent-to-left-margin)
-                  (insert "\
+                  (specman-insert-and-indent-to "\
 --  <method>
-")
-                  (forward-line -2)
-                  (for i from 1 to 2 do (progn
-                                          (forward-line)
-                                          (indent-to header-indent)))
+" header-indent)
                   (specman-minor-comment-separator)
                   (goto-char start)
                   (search-forward "<method>")
@@ -4390,17 +4373,13 @@ method name only, otherwise a full header with comments."
                   (end-of-line))
               (progn
                 (indent-to-left-margin)
-                (insert "\
+                (specman-insert-and-indent-to "\
 --  Method      :  <method>
 --  Description :  <description>
 --  Parameters  :  <parameters>
 --  Return Val  :  <return val>
 --  Note        :  <note>
-")
-                (forward-line -6)
-                (for i from 1 to 6 do (progn
-                                        (forward-line)
-                                        (indent-to header-indent)))
+" header-indent)
                 (specman-minor-comment-separator)
                 (goto-char start)
                 (search-forward "<method>")
