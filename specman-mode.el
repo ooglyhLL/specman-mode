@@ -231,14 +231,16 @@
   :group 'specman-mode
   )
 
-(defcustom specman-compile-command "${SPECMAN_HOME}/bin/sn_compile.sh "
+(defcustom specman-compile-command "${SPECMAN_HOME}/bin/sn_compile.sh"
   "String used to compile e files."
   :group 'specman-mode
+  :type 'string
   )
 
-(defcustom specman-make-command "/usr/bin/make "
+(defcustom specman-make-command "/usr/bin/make"
   "String used to invoke make"
   :group 'specman-mode
+  :type 'string
   )
 
 (defcustom specman-index-menu-active t
@@ -2929,7 +2931,7 @@ See also `specman-font-lock-extra-types'.")
   "Invoke compile, customized for specman"
   (interactive)
   (let ((compile-command
-         (concat specman-compile-command
+         (concat specman-compile-command " "
                  buffer-file-name))
         (compilation-read-command
          t)
