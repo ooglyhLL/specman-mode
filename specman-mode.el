@@ -101,6 +101,16 @@
   :type 'integer
   )
 
+(defcustom specman-default-line-comment-starter "--"
+  "*Default character sequence to start line comments.
+
+Used in comment inserting functions and for creating comments
+from templates."
+  :group 'specman-mode
+  :type '(choice (const :tag "-- (VHDL)" "--")
+                 (const :tag "// (Verilog)" "//"))
+  )
+
 (defcustom specman-auto-newline nil
   "*ON (or non nil) means to automatically newline after inserting a semicolon."
   :group 'specman-mode
@@ -3732,7 +3742,7 @@ indentation change."
             (specman-kill-line-comment))
                                         ;(message "str = \"%s\"" str)
           (insert (concat
-                   " -- "
+                   " " specman-default-line-comment-starter " "
                    (if (> (length str)
                           30)
                        (concat (substring str 0 30 )
@@ -3921,10 +3931,13 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (save-excursion
     (indent-region (mark) (point))))
 
-(defun specman-insert-and-indent-to (str col)
+(defun specman-insert-and-indent-to (str col &optional prefix)
   "Insert string STR at point and indent each inserted line to COL."
   (let ((beg (point)))
-    (insert str)
+    (insert
+     (if prefix
+         (replace-regexp-in-string "^" specman-default-line-comment-starter str)
+       str)
     (let ((end (point-marker)))
       ;; Note that END position will change during loop execution as
       ;; lines are indented. Hence a marker, not just point.
@@ -3933,7 +3946,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
       (while (< (point) end)
         (indent-to col)
         (forward-line))
-      (goto-char end))))
+      (goto-char end)))))
 
 ;; -----------------------------------------------------------------------------
 ;;  Scope Queries
@@ -4001,6 +4014,16 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
                                         ;--============================================================================--
 
 ;; -----------------------------------------------------------------------------
+(defun specman-comment-line ()
+  "Insert line comment before the current line and reindent it."
+  (interactive)
+
+  (indent-according-to-mode)
+  (back-to-indentation)
+  (insert (concat specman-default-line-comment-starter
+                  "  ")))
+
+;; -----------------------------------------------------------------------------
 (defun specman-comment-line-w-minus ()
   "Insert a -- comment before the current line and reindent it."
   (interactive)
@@ -4008,6 +4031,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (indent-according-to-mode)
   (back-to-indentation)
   (insert "--  "))
+(make-obsolete 'specman-comment-line-w-minus 'specman-comment-line "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-comment-line-w-slash ()
@@ -4017,6 +4041,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (indent-according-to-mode)
   (back-to-indentation)
   (insert "//  "))
+(make-obsolete 'specman-comment-line-w-slash 'specman-comment-line "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-exclude-code-region (beg end)
@@ -4079,7 +4104,7 @@ never less than 2 characters."
 
 ;; -----------------------------------------------------------------------------
 (defun specman-major-comment-separator ()
-  "Insert a comment line of '=', prefixed and suffixed by '--',
+  "Insert a comment line of '=', prefixed and suffixed by `specman-default-line-comment-starter',
 never less than 4 characters."
   (interactive)
 
@@ -4091,11 +4116,11 @@ never less than 4 characters."
     (when (<= cur-col
               (- specman-max-line-length 4))
       (progn
-        (insert "--")
+        (insert specman-default-line-comment-starter)
         (while (> counter 0)
           (insert "=")
           (setq counter (- counter 1)))
-        (insert "--")))
+        (insert specman-default-line-comment-starter)))
     (newline)
     (indent-to-left-margin)
     (indent-to cur-col)))
@@ -4228,8 +4253,8 @@ the struct/define name only, otherwise a full header with comments."
                 (progn
                   (indent-to-left-margin)
                   (specman-insert-and-indent-to "\
---  <struct>
-" header-indent)
+  <struct>
+" header-indent specman-default-line-comment-starter)
                   (specman-major-comment-separator)
                   (goto-char start)
                   (search-forward "<struct>")
@@ -4238,10 +4263,10 @@ the struct/define name only, otherwise a full header with comments."
               (progn
                 (indent-to-left-margin)
                 (specman-insert-and-indent-to "\
---  Struct      :  <struct>
---  Description :  <description>
---  Note        :  <note>
-" header-indent)
+  Struct      :  <struct>
+  Description :  <description>
+  Note        :  <note>
+" header-indent specman-default-line-comment-starter)
                 (specman-major-comment-separator)
                 (goto-char start)
                 (search-forward "<struct>")
@@ -4259,7 +4284,8 @@ the struct/define name only, otherwise a full header with comments."
                   (search-forward "<note>")
                   (specman-comment-start-entry "Note"
                                                "<Note> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4272,7 +4298,8 @@ the struct/define name only, otherwise a full header with comments."
                   (search-forward "<description>")
                   (specman-comment-start-entry "Description"
                                                "<Description> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4364,8 +4391,8 @@ method name only, otherwise a full header with comments."
                 (progn
                   (indent-to-left-margin)
                   (specman-insert-and-indent-to "\
---  <method>
-" header-indent)
+  <method>
+" header-indent specman-default-line-comment-starter)
                   (specman-minor-comment-separator)
                   (goto-char start)
                   (search-forward "<method>")
@@ -4374,12 +4401,12 @@ method name only, otherwise a full header with comments."
               (progn
                 (indent-to-left-margin)
                 (specman-insert-and-indent-to "\
---  Method      :  <method>
---  Description :  <description>
---  Parameters  :  <parameters>
---  Return Val  :  <return val>
---  Note        :  <note>
-" header-indent)
+  Method      :  <method>
+  Description :  <description>
+  Parameters  :  <parameters>
+  Return Val  :  <return val>
+  Note        :  <note>
+" header-indent specman-default-line-comment-starter)
                 (specman-minor-comment-separator)
                 (goto-char start)
                 (search-forward "<method>")
@@ -4397,7 +4424,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<note>")
                   (specman-comment-start-entry "Note"
                                                "<Note> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4410,7 +4438,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<return val>")
                   (specman-comment-start-entry "Return-Val"
                                                "<Return Val> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4423,7 +4452,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<parameters>")
                   (specman-comment-start-entry "Parameters"
                                                "<Parameters> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4436,7 +4466,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<description>")
                   (specman-comment-start-entry "Description"
                                                "<Description> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4629,16 +4660,24 @@ as much as possible.  comment style is preserved."
       )))
 
 ;; -----------------------------------------------------------------------------
-(defun specman-insert-comment (prefix)
+(defun specman-insert-comment (&optional prefix)
   "Insert a comment in the current location.  A comment buffer is opened for
    text editing with auto-fill mode (line length being handled automatically).
    The comment style is preserved if already entered."
 
   (specman-comment-start-entry "Entry"
                                "<Comment Entry> "
-                               prefix
+                               (or prefix (concat specman-default-line-comment-starter
+                                                  "  "))
                                (current-column)
                                (set-marker (make-marker) (point))))
+
+(defun specman-insert-line-comment ()
+  "Start entry of a line comment, or if currently inside a comment - edit it."
+  (interactive)
+  (if (specman-within-comment-p)
+      (specman-reedit-comment)
+    (specman-insert-comment)))
 
 (defun specman-insert-minus-comment ()
   "Start entry of a -- comment, or if currently inside a comment - edit it."
@@ -4646,6 +4685,7 @@ as much as possible.  comment style is preserved."
   (if (specman-within-comment-p)
       (specman-reedit-comment)
     (specman-insert-comment "--  ")))
+(make-obsolete 'specman-insert-minus-comment 'specman-insert-line-comment "1.25")
 
 (defun specman-insert-slash-comment ()
   "Start entry of a // comment, or if currently inside a comment - edit it."
@@ -4653,6 +4693,7 @@ as much as possible.  comment style is preserved."
   (if (specman-within-comment-p)
       (specman-reedit-comment)
     (specman-insert-comment "//  ")))
+(make-obsolete 'specman-insert-slash-comment 'specman-insert-line-comment "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-internal-is-matching-comment-line (comment-column comment-prefix)
@@ -4768,7 +4809,7 @@ style.  returns:
   "Insert a standard Specman file header."
   (interactive)
   (let ((start (point)))
-    (insert "\
+    (insert (replace-regexp-in-string "^//" specman-default-line-comment-starter "\
 //-----------------------------------------------------------------------------
 // Title         : <title>
 // Project       : <project>
@@ -4789,7 +4830,7 @@ style.  returns:
 // <modhist>
 //-----------------------------------------------------------------------------
 
-")
+"))
     (goto-char start)
     (search-forward "<filename>")
     (replace-match (buffer-name) t t)
@@ -5131,7 +5172,7 @@ the user to edit."
   ; the list. The order in the other lists is not important.
   ; C++ style comments are already recognized.
   '(progn
-     (setcar filladapt-token-table '("---*" e-comment))
+     (setcar filladapt-token-table '("\\(--\\|//\\)-*" e-comment))
      (setcar filladapt-token-match-table '(e-comment e-comment))
      (setcar filladapt-token-conversion-table '(e-comment . exact)))
 )
