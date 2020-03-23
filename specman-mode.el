@@ -1039,40 +1039,57 @@ have an updating cost and the index itself to nil."
 
 (defun specman-setup-dual-comments (table)
   ;; Set up TABLE to handle comments
-  ;; unfortunately, emacs can't handle 2 styles of dual comments
-  ;; properly, so only // is defined here.  -- is handled
-  ;; separately.  xemacs can, but we must use something which
-  ;; is compatible for both emacsen.
-  ;; instead, the second comment style /*...*/ is used, although
-  ;; it is only a valid syntax in the context of c routines.
-  
+  ;;
+  ;; Specman (IEEE1647-2019) supports three different comment styles:
+  ;;
+  ;; 1. Line comments starting with "--"
+  ;; 2. Line comments starting with "//"
+  ;; 3. Block comments framed by "/*", and "*/"
+  ;;
+  ;; The way both Emacs and XEmacs can deal with multiple different
+  ;; comment styles is not flexible enough for our purposes, so we
+  ;; will have to use workarounds.
+  ;;
+  ;; Previous versions of specman-mode.el were setting up the syntax
+  ;; table for the latter two styles, while simply "painting" comments
+  ;; starting with "--" in `font-lock-comment-face' (search for
+  ;; `specman-match-minus-comments' in the font-lock configuration
+  ;; below).
+  ;;
+  ;; While this helps syntax highlighting, it carries absolutely no
+  ;; syntactic information which could be used for parsing/motion
+  ;; purposes in other places of specman-mode.el.
+  ;;
+  ;; For the time being this is what will continue to work for XEmacs
+  ;; but could be dropped anytime if maintenance of turns out to be an
+  ;; issue in the future.
+  ;;
+  ;; As for Emacs, see the definition of
+  ;; `specman-syntax-propertize-function', below.
+
   (if (featurep 'xemacs)
-      ;; XEmacs has the best implementation
       (progn
-        ;;    (modify-syntax-entry ?/  ". 12" table)
-        ;;    (modify-syntax-entry ?-  ". 56" table)
-        ;;    (modify-syntax-entry ?\n "> 37" table)
-        ;;    (modify-syntax-entry ?\f "> 37" table)
         (modify-syntax-entry ?/  ". 1258" table)
         (modify-syntax-entry ?*  ". 67" table)
         (modify-syntax-entry ?\n "> 3" table)
         (modify-syntax-entry ?\f "> 3" table)
         )
-    ;; Emacs does things differently, but we can work with it
     (progn
-      ;;    (modify-syntax-entry ?/  ". 12" table)
-      ;;    (modify-syntax-entry ?\n ">"    table)
-      ;;    (modify-syntax-entry ?\f ">"    table)
-      ;;    (modify-syntax-entry ?-  "< 12b" table)
-      ;;    (modify-syntax-entry ?\n "> b"    table)
-      ;;    (modify-syntax-entry ?\f "> b"    table)
-      (modify-syntax-entry ?/  ". 124" table)
+      (modify-syntax-entry ?/  ". 14" table)
       (modify-syntax-entry ?*  ". 23b" table)
       (modify-syntax-entry ?\n ">"    table)
       (modify-syntax-entry ?\f ">"    table)
       ))
   )
 
+(unless (featurep 'xemacs)
+  ;; Emacs 24.1 and beyond support syntax table text-properties,
+  ;; i.e. the syntax class of text can be modified locally, based on
+  ;; rules.
+  (defalias 'specman-syntax-propertize-function
+    (syntax-propertize-rules
+     ("\\(?:\\(?1:-\\)-\\|\\(?1:/\\)/\\)" (1 "<"))
+     )))
 
 ;; =================================================
 ;; SPECMAN IMENU FEATURE
@@ -2308,7 +2325,6 @@ See also `specman-font-lock-extra-types'.")
 
   (setq specman-font-lock-keywords
         (list
-         ;;(cons "\\(//.*$\\)\\|\\(--.*$\\)" '(0 font-lock-comment-face)) ;; not needed
          ;; Fontify all types
          (cons specman-types-keywords
                '(0 'font-lock-type-face append))
@@ -2372,18 +2388,14 @@ See also `specman-font-lock-extra-types'.")
                          '(0 'specman-punctuation-face append))))))
 
 
-  ;; Fontify comments
-  ;; - '//' comments handled as syntax in both emacsen but '--' only in
-  ;;   xemacs.
-  ;; - this handles '--' comments
-  ;;   - using this even in xemacs, which should be able to handle 2 fully
-  ;;     independent comment types, but fails to do so in e.g. version 21.1
-  (setq specman-font-lock-keywords
-        (append specman-font-lock-keywords
-                (list
-                 '(specman-match-minus-comments
-                   (0 'font-lock-comment-face t))
-                 )))
+  (when (featurep 'xemacs)
+    ;; "Paint" line comments starting with "--"
+    (setq specman-font-lock-keywords
+          (append specman-font-lock-keywords
+                  (list
+                   '(specman-match-minus-comments
+                     (0 'font-lock-comment-face t))
+                   ))))
 
   (setq specman-font-lock-keywords-1
         (append specman-font-lock-keywords
@@ -2666,25 +2678,26 @@ See also `specman-font-lock-extra-types'.")
                 nil
               t)))))))
 
-(defun specman-match-minus-comments (limit)
-  "Match a '-- ... EOL' region, setting match-data and returning t, else nil."
-  (when (< (point) limit)
-    (let ((start
-           (progn
-             (beginning-of-line)
-             (specman-search-forward-minus-comment limit)))
-          )
-      (when start
-        (goto-char start)
-        (let ((end
-               (progn
-                 (forward-line)
-                 (if (< (point) limit)
-                     (point)
-                   limit)))
-              )
-          (store-match-data (list start end))
-          t)))))
+(when (featurep 'xemacs)
+  (defun specman-match-minus-comments (limit)
+    "Match a '-- ... EOL' region, setting match-data and returning t, else nil."
+    (when (< (point) limit)
+      (let ((start
+             (progn
+               (beginning-of-line)
+               (specman-search-forward-minus-comment limit)))
+            )
+        (when start
+          (goto-char start)
+          (let ((end
+                 (progn
+                   (forward-line)
+                   (if (< (point) limit)
+                       (point)
+                     limit)))
+                )
+            (store-match-data (list start end))
+            t))))))
 
 (defun specman-search-forward-long-line (limit)
   (when (< specman-max-line-length
@@ -3003,6 +3016,12 @@ Key Bindings:
   
   (set (make-local-variable 'font-lock-defaults)
        (get 'specman-mode 'font-lock-defaults))
+
+  (set (make-local-variable 'syntax-propertize-function)
+       #'specman-syntax-propertize-function)
+
+  (set (make-local-variable 'comment-use-syntax)
+       t)
 
   (make-local-variable 'comment-start)
   (make-local-variable 'comment-end)
