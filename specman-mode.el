@@ -1046,50 +1046,85 @@ have an updating cost and the index itself to nil."
   ;; 2. Line comments starting with "//"
   ;; 3. Block comments framed by "/*", and "*/"
   ;;
+  ;; In addition there are regions between code segments (here
+  ;; historically referred to as ex-code), which are effectively
+  ;; comments, too.
+  ;;
   ;; The way both Emacs and XEmacs can deal with multiple different
   ;; comment styles is not flexible enough for our purposes, so we
   ;; will have to use workarounds.
   ;;
   ;; Previous versions of specman-mode.el were setting up the syntax
   ;; table for the latter two styles, while simply "painting" comments
-  ;; starting with "--" in `font-lock-comment-face' (search for
-  ;; `specman-match-minus-comments' in the font-lock configuration
-  ;; below).
+  ;; starting with "--", as well as ex-code regions in
+  ;; `font-lock-comment-face' (search for
+  ;; `specman-match-ex-code-regions' and
+  ;; `specman-match-minus-comments' in previous revisions of this
+  ;; file).
   ;;
   ;; While this helps syntax highlighting, it carries absolutely no
   ;; syntactic information which could be used for parsing/motion
   ;; purposes in other places of specman-mode.el.
   ;;
-  ;; For the time being this is what will continue to work for XEmacs
-  ;; but could be dropped anytime if maintenance of turns out to be an
-  ;; issue in the future.
-  ;;
-  ;; As for Emacs, see the definition of
-  ;; `specman-syntax-propertize-function', below.
+  ;; At this point it stops making sense to continue to maintain
+  ;; XEmacs compatibility. Conditional code will be removed gradually.
 
-  (if (featurep 'xemacs)
-      (progn
-        (modify-syntax-entry ?/  ". 1258" table)
-        (modify-syntax-entry ?*  ". 67" table)
-        (modify-syntax-entry ?\n "> 3" table)
-        (modify-syntax-entry ?\f "> 3" table)
-        )
-    (progn
-      (modify-syntax-entry ?/  ". 14" table)
-      (modify-syntax-entry ?*  ". 23b" table)
-      (modify-syntax-entry ?\n ">"    table)
-      (modify-syntax-entry ?\f ">"    table)
-      ))
+  (modify-syntax-entry ?/  ". 14" table)
+  (modify-syntax-entry ?*  ". 23b" table)
+  (modify-syntax-entry ?\n ">" table)
+  (modify-syntax-entry ?\f ">" table)
   )
 
-(unless (featurep 'xemacs)
-  ;; Emacs 24.1 and beyond support syntax table text-properties,
-  ;; i.e. the syntax class of text can be modified locally, based on
-  ;; rules.
-  (defalias 'specman-syntax-propertize-function
-    (syntax-propertize-rules
-     ("\\(?:\\(?1:-\\)-\\|\\(?1:/\\)/\\)" (1 "<"))
+;; Emacs 24.1 and beyond support syntax table text-properties,
+;; i.e. the syntax class of text can be modified locally, based on
+;; rules.
+;;
+;; Ideal for our purposes is the addition of "generic comment
+;; delimiters" which allows us to distinguish line comments, block
+;; comments, and ex-code immediately in the parser state returned by
+;; `syntax-ppss', they are defined as comment-style "a", "b" and
+;; generic comment, respectively.
+
+(defalias 'specman-syntax-propertize-function
+  ;; This lambda has been obtained by first trying to get this sorted
+  ;; using `syntax-propertize-rules', then fine-tuning the result.
+  ;; The tricky part is matching ex-code end with the delimiter at the
+  ;; beginning of buffer.
+  ;;
+  ;; (syntax-propertize-rules
+  ;;   ;; Make sure all groups are uniquely identified. This macro
+  ;;   ;; creates one big mess of all regexps below.
+  ;;   ("\\(?:\\(?1:-\\)-\\|\\(?1:/\\)/\\)"                        (1 "<")) ;; line comment
+  ;;   ("\\(?2:\\`<\\)'\\s-*\\(?3:\n\\)"                           (2 "!") (3 "!")) ;; ex-code begin/end
+  ;;   ("\\(?:\\(?2:\\`\\(?:.\\|\n\\)\\)\\|\\(?2:^'\\)>\\)"        (2 "!")) ;; ex-code begin
+  ;;   ("\\(?:\\(?3:\\(?:.\\|\n\\)\\'\\)\\|^<'\\s-*\\(?3:\n\\)\\)" (3 "!")) ;; ex-code end
+  ;;   )
+  (lambda (start end)
+   (goto-char start)
+   (while (and (< (point) end) (re-search-forward
+                                "\\(?2:\\`<\\)'\\s-*\\(?3:
+\\)\\|\\(?:\\(?3:\\(?:.\\|
+\\)\\'\\)\\|^<'\\s-*\\(?3:
+\\)\\)\\|\\(?:\\(?2:\\`\\(?:.\\|
+\\)\\)\\|\\(?2:^'\\)>\\)\\|\\(?:\\(?1:-\\)-\\|\\(?1:/\\)/\\)" end t))
+     ;; Group 1 is exclusive, groups 2 and 3 can be matched together.
+     (if (match-beginning 1)
+         (put-text-property (match-beginning 1)
+                            (match-end 1)
+                            'syntax-table
+                            '(11))
+       (if (match-beginning 2)
+           (put-text-property (match-beginning 2)
+                              (match-end 2)
+                              'syntax-table
+                              '(14)))
+       (if (match-beginning 3)
+           (put-text-property (match-beginning 3)
+                              (match-end 3)
+                              'syntax-table
+                              '(14))))
      )))
+
 
 ;; =================================================
 ;; SPECMAN IMENU FEATURE
@@ -2388,15 +2423,6 @@ See also `specman-font-lock-extra-types'.")
                          '(0 'specman-punctuation-face append))))))
 
 
-  (when (featurep 'xemacs)
-    ;; "Paint" line comments starting with "--"
-    (setq specman-font-lock-keywords
-          (append specman-font-lock-keywords
-                  (list
-                   '(specman-match-minus-comments
-                     (0 'font-lock-comment-face t))
-                   ))))
-
   (setq specman-font-lock-keywords-1
         (append specman-font-lock-keywords
                 (list
@@ -2435,10 +2461,6 @@ See also `specman-font-lock-extra-types'.")
   (setq specman-font-lock-keywords-3
         (append specman-font-lock-keywords-2  
                 (list
-                 ;; Fontify as comments anything not in e-code scope
-                 ;; (i.e. delimited by <'...'>)
-                 '(specman-match-ex-code-regions 
-                   (0 'font-lock-comment-face t))
                  ;; Highlight text beyond specman-max-line-length
                  '(specman-match-beyond-max-line-length
                    (0 'specman-highlight-beyond-max-line-length-face t))
@@ -2637,67 +2659,10 @@ See also `specman-font-lock-extra-types'.")
   (or (specman-within-ex-code-point)
       (specman-line-within-star-comment-p)))
 
-(defun specman-start-ex-code-point (limit)
-  "Return point before comment starts if before LIMIT, else nil."
-  (save-excursion
-    (when (re-search-forward "^'>" limit t)
-      (match-beginning 0))))
-
-(defun specman-end-ex-code-point (limit)
-  "Return point after comment ends if before LIMIT, else nil."
-  (save-excursion
-    (when (re-search-forward "^<'" limit t)
-      (match-end 0))))
-
 (defvar ecom-syntax-highlight nil
   "True if the current buffer is an .ecom file and should be syntax
  highlighted as such (i.e. ignore ex-code-regions).")
 (make-variable-buffer-local 'ecom-syntax-highlight)
-
-(defun specman-match-ex-code-regions (limit)
-  "Match a non code block, setting match-data and returning t, else nil."
-  (when (not ecom-syntax-highlight)
-    (when (< (point) limit)
-      (let ((start
-             (or (specman-within-ex-code-point)
-                 (specman-start-ex-code-point limit)))
-            (case-fold-search
-             t)
-            (origin
-             (point))
-            )
-        (when start
-          (goto-char start)
-          (let ((end
-                 (or (specman-end-ex-code-point limit)
-                     limit))
-                )
-            (goto-char end)
-            (store-match-data (list start end))
-            (if (= (point) origin)
-                nil
-              t)))))))
-
-(when (featurep 'xemacs)
-  (defun specman-match-minus-comments (limit)
-    "Match a '-- ... EOL' region, setting match-data and returning t, else nil."
-    (when (< (point) limit)
-      (let ((start
-             (progn
-               (beginning-of-line)
-               (specman-search-forward-minus-comment limit)))
-            )
-        (when start
-          (goto-char start)
-          (let ((end
-                 (progn
-                   (forward-line)
-                   (if (< (point) limit)
-                       (point)
-                     limit)))
-                )
-            (store-match-data (list start end))
-            t))))))
 
 (defun specman-search-forward-long-line (limit)
   (when (< specman-max-line-length
@@ -3013,6 +2978,9 @@ Key Bindings:
   (setq parse-sexp-ignore-comments t)
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'specman-indent-line)
+
+  (set (make-local-variable 'parse-sexp-lookup-properties)
+       t)
   
   (set (make-local-variable 'font-lock-defaults)
        (get 'specman-mode 'font-lock-defaults))
