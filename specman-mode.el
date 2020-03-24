@@ -62,9 +62,11 @@
 (require 'reporter)
 (require 'easymenu)
 
-(if (featurep 'xemacs)
-    (defalias 'specman--char= 'char=) ; XEmacs
-  (defalias 'specman--char= '=))      ; FSF Emacs
+(eval-and-compile
+  (if (featurep 'xemacs)
+      (defalias 'specman--char= 'char=) ; XEmacs
+    (defalias 'specman--char= '=))      ; FSF Emacs
+  )
 (eval-when-compile
   ;; Try hard to inline the alias as efficiently as possible
   ;; (see https://nullprogram.com/blog/2019/12/10/)
