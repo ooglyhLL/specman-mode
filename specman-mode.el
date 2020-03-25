@@ -398,8 +398,7 @@ format (e.g. 09/17/1997) is not supported."
   (looking-at "^[ \t]*$"))
 
 (defun specman-within-string-p ()
-  (save-excursion
-    (nth 3 (parse-partial-sexp (point-min) (point)))))
+  (nth 3 (syntax-ppss (point))))
 
 (defsubst specman-line-within-string-p ()
   (save-excursion
@@ -1418,145 +1417,55 @@ The arguments to A and B may be characters or nil."
       )
   )
 
-(defun specman-search-forward-minus-comment (limit)
-  "Look for a -- comment between point and a given limit"
-  (let ((continue
-         t
-         )
-        (return-val
-         nil
-         )
-        )
-    (while (and continue
-                (< (point) limit)
-                (search-forward "--" limit t))
-      (if (specman-within-string-p)
-          (or (search-forward "\"" limit t)
-              (setq continue nil))
-        (progn
-          (setq continue nil)
-          (goto-char (match-beginning 0))
-          (setq return-val (point)))))
-    return-val))
-
-
 (defun specman-skip-forward-comment-or-string ()
   "Move beyond and return true if in a string or comment"
-  (let ((state
-         (save-excursion
-           (parse-partial-sexp (point-min) (point)))
-         )
-        )
-    (save-match-data
-      (cond
-       (;; outside e-code block
-        (save-excursion
-          (re-search-forward "^\\(?:\\(<'\\)\\|\\('>\\)\\)" (point-max) t)
-          (not (match-beginning 2)))
-        
-        (if (match-end 1)
-            (goto-char (match-end 1))
-          (goto-char (point-max)))
-        t
-        )
-       (;; inside string
-        (nth 3 state)
-        
-        (re-search-forward "\\(?:[^\\]\\|[\\][\\]\\)\"")
-        (goto-char (match-end 0))
-        t
-        )
-       (;; inside // comment (/*...*/ also)
-        (nth 4 state)
-
-        (if (save-excursion
-              (goto-char (nth 8 state))
-              (looking-at "//"))
-            ;; in //... comment
-            (forward-line 1)
-          ;; in /*...*/ comment
-          (search-forward "*/" (point-max) t))
-        t
-        )
-       (;; true if we are in a -- ... EOL region
-        (save-excursion
-          (let ((cur-position (point))
-                )
-            (back-to-indentation)
-            (specman-search-forward-minus-comment cur-position)))
-        
-        (forward-line 1)
-        t
-        )
-       (;; default
-        t
-        
-        nil
-        )
-       )
+  (let ((state (syntax-ppss (point))))
+    (cond
+     (;; inside string
+      (nth 3 state)
+      (goto-char (nth 8 state)) ;; go to beginning of string
+      (forward-sexp)            ;; hop to its end
+      t
       )
+     (;; inside comment
+      (nth 4 state)
+      (goto-char (nth 8 state)) ;; go to beginning of comment
+      (forward-comment 1)       ;; hop to its end
+      t
+      )
+     (;; At beginning of buffer
+      (= (point) (point-min))
+      (forward-comment 1) ;; move to beginning of code segment
+      )
+     (;; default
+      t
+      nil
+      )
+     )
     )
   )
 
 (defun specman-skip-backward-comment-or-string ()
   "Move to the begining and return true if in a string or comment"
-  (let ((state
-         (save-excursion
-           (parse-partial-sexp (point-min) (point)))
-         )
-        )
-    (save-match-data
-      (cond
-       (;; outside e-code block
-        (save-excursion
-          (re-search-backward "^\\(?:\\(<'\\)\\|\\('>\\)\\)" (point-min) t)
-          (not (match-beginning 1)))
-        
-        (if (match-beginning 2)
-            (goto-char (match-beginning 2))
-          (goto-char (point-min)))
-        t
-        )
-       (;; inside string
-        (nth 3 state)
-        
-        (re-search-backward "\\(?:[^\\]\\|[\\][\\]\\)\"")
-        (goto-char (match-beginning 0))
-        t)
-       (;; inside // comment (/*...*/ also)
-        (nth 4 state)
-        
-        ;;(search-backward "//")
-        (goto-char (nth 8 state))
-        t
-        )
-       (;; true if we are in a -- ... EOL region
-        (save-excursion
-          (let ((cur-position (point))
-                )
-            (back-to-indentation)
-            (specman-search-forward-minus-comment cur-position)))
-        
-        (goto-char (match-beginning 0))
-        t)
-       (;; default
-        t
-        
-        nil)
-       )
-      )
-    )
-  )
+  (let* ((state (syntax-ppss (point)))
+         (string-or-comment (or (nth 3 state)
+                                (nth 4 state))))
+    (when string-or-comment
+      (goto-char (nth 8 state)))
+    string-or-comment))
 
 (defun specman-forward-ws (&optional bound)
   "Forward skip over syntactic whitespace"
   (skip-chars-forward " \t\n")
   (while 
       (cond
-       ((looking-at "[ \t\n]") (skip-chars-forward "[ \t\n]"))
-       ((looking-at "--")      (forward-to-indentation 1))
-       ((looking-at "//")      (forward-to-indentation 1))
-       ((looking-at "^'>")     (search-forward "\n<'" nil t))
+       ((looking-at "[ \t\n]")
+        (skip-chars-forward "[ \t\n]"))
+       ((looking-at "--\\|//")
+        (forward-to-indentation 1))
+       ((looking-at "/\\*\\|^'>")
+        (forward-comment 1)
+        (forward-to-indentation 0))
        (t
         nil))))
 
@@ -1566,24 +1475,12 @@ The arguments to A and B may be characters or nil."
     (specman-up-list)))
 
 (defun specman-within-line-comment-p ()
-  "Return point if in a // or -- comment."
-  (or (save-excursion
-        (let ((state
-               (parse-partial-sexp (point-min) (point)))
-              )
-          (and (nth 4 state)
-               (goto-char (nth 8 state))
-               (if (looking-at "//")
-                   (point)
-                 nil))))
-      (save-excursion ;; true if we are in a -- ... EOL region
-        (let ((cur-position
-               (point))
-              )
-          (back-to-indentation)
-          (if (specman-search-forward-minus-comment cur-position)
-              (point)
-            nil)))))
+  "Return point at beginning of line comment or nil"
+  (let ((state (syntax-ppss (point))))
+    (and (nth 4 state)        ;; inside comment
+         (null (nth 7 state)) ;; style 'a' (line comment)
+         (nth 8 state)        ;; starting position
+         )))
 
 (defun specman-line-within-comment-p ()
   "Return true if the current line is fully commented-out as a line comment."
@@ -1595,25 +1492,19 @@ The arguments to A and B may be characters or nil."
   "Return true if the current line is fully in a star comment."
   (save-excursion
     (back-to-indentation)
-    (nth 4 (parse-partial-sexp (point-min) (point)))))
+    (let ((state (syntax-ppss (point))))
+      (and (nth 4 state)
+           (eq (nth 7 state) 'b)))))
 
 (defun specman-line-within-star-comment-or-string-p ()
   "Return true if the current line begins within a string or a star comment."
   (save-excursion
     (back-to-indentation)
-    (let* ((point-status
-            (parse-partial-sexp (point-min) (point))
-            )
-           (in-string
-            (nth 3 point-status)
-            )
-           (in-star-comment
-            (nth 4 point-status)
-            )
-           )
-      (or in-string
-          in-star-comment)))
-  )
+    (let ((state (syntax-ppss (point))))
+      (or (nth 3 state)               ;; string
+          (and (nth 4 state)          ;; star comment
+               (eq (nth 7 state) 'b)) ;;
+          ))))
 
 (defun specman-indent-pos ()
   (save-excursion
@@ -2644,11 +2535,9 @@ See also `specman-font-lock-extra-types'.")
 
 (defun specman-within-ex-code-point ()
   "Return point if within ex-code region, else nil."
-  (save-excursion
-    (if (re-search-backward "^\\(?:\\('>\\)\\|\\(<'\\)\\)" nil 'm)
-        (if (match-beginning 2)
-            nil
-          (point))
+  (let ((state (syntax-ppss (point))))
+    (when (and (nth 4 state)                     ;; inside comment
+               (eq (nth 7 state) 'syntax-table)) ;; ex-code
       (point))))
 
 (defun specman-within-region-comment-p ()
