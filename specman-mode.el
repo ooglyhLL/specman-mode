@@ -2392,146 +2392,48 @@ See also `specman-font-lock-extra-types'.")
 ;; =================================================
 ;; SPECMAN UTILITY FUNCTIONS
 ;; =================================================
-
-(defun specman-up-list (&optional within-code-region)
+;; FIXME: "list" refers to parentheses pair
+;;        "scope" refers to curlies
+(defun specman-up-list ()
   "Move up one list, skipping over specman's many comment styles. 
-   Return point of opener if we are in a list"
-  
-  (if global-scope-index
-      (specman-scope-index-up-list global-scope-index within-code-region)
-    (let (
-          ;; this can be wrong when there is a list within a
-          ;; parens, but there is a check below that will recover
-          ;; from that case.
-          (lim
-           (save-excursion
-             (specman-beg-of-defun within-code-region)))
-          (nest
-           1)
-          (start-point
-           (point))
-          tb
-          )
+Return point of opener if we are in a list"
+  (let ((start (point))
+        (state))
+    (while (progn
+             (setq state (syntax-ppss))
+             (when (not (zerop (nth 0 state)))
+               (goto-char (nth 1 state))
+               (/= (char-after) ?\())
+             ))
+    (if (zerop (nth 0 state))
+        (goto-char start)
+      (point)))
+  )
 
-      (unless within-code-region
-        (specman-skip-backward-comment-or-string))
-      
-      (catch 'skip
-        (while (and (> (point) lim)
-                    (specman-re-search-backward "[()}]"
-                                                lim
-                                                t
-                                                t))
-          (setq tb (char-after))
-          (cond
-           ((= tb ?\( ) (setq nest (1- nest)))
-           ((= tb ?\) ) (setq nest (1+ nest)))
-           
-           ;; this skips the block and also moves point
-           ((= tb ?\} ) (setq lim (save-excursion
-                                    (specman-up-scope t)
-                                    (if (specman-re-search-backward ";" nil t t)
-                                        (point)
-                                      (point-min)))))
-           
-           )
-          (if (= 0 nest)
-              (throw 'skip (point)))
-          )
-        ;; if we reached this point then the search failed
-        (goto-char start-point)
-        nil)
-      )
-    ))
-
-(defun specman-up-scope (&optional within-code-region)
+(defun specman-up-scope ()
   "Move up one scope, skipping over specman's many comment styles.
-   Return point of opener if we are in a list"
+Return point of opener if we are inside a scope, else move to
+beginning of buffer and return point."
+  (while (let ((state (syntax-ppss)))
+           (if (zerop (nth 0 state))
+               ;; already at top level
+               (progn
+                 (goto-char (point-min))
+                 nil)
+             (goto-char (nth 1 state))
+             (/= (char-after) ?\{))))
+  (point)
+  )
 
-  (if global-scope-index
-      (specman-scope-index-up-scope global-scope-index within-code-region)
-    (let ((lim (save-excursion
-                 (specman-beg-of-defun within-code-region t)))
-          (nest 1)
-          tb
-          )
-
-      (unless within-code-region
-        (specman-skip-backward-comment-or-string))
-      
-      (catch 'skip
-        (while
-            (and (> (point) lim)
-                 (specman-re-search-backward "[{}]"
-                                             lim
-                                             'move
-                                             t))
-          (setq tb (char-syntax (char-after)))
-          (cond
-           ((= tb ?\() (setq nest (1- nest)))
-           ((= tb ?\)) (setq nest (1+ nest)))
-           )
-          (if (= 0 nest)
-              (throw 'skip (point)))
-          )
-        ;; if we reached this point then the search failed
-        (goto-char (point-min))
-        (throw 'skip (point)))
-      )
-    ))
-
-(defun specman-down-scope (&optional within-code-region)
+(defun specman-down-scope ()
   "Move down one scope, skipping over specman's many comment styles.
-   Return point of closer if we are in a list"
-
-  (if global-scope-index
-      (specman-scope-index-down-scope global-scope-index within-code-region)
-    (let (
-          (lim
-           (save-excursion
-             (specman-end-of-e-code)
-             (point))
-           )
-          (nest
-           1
-           )
-          )
-
-      (unless within-code-region
-        (specman-skip-forward-comment-or-string))
-      
-      (catch 'skip
-        (while
-            (and (< (point) lim)
-                 (specman-re-search-forward "\\({\\)\\|\\(}\\)\\|\\(//\\|--\\)\\|\\(^'>\\)\\|\\(\"\\)"
-                                            lim
-                                            'move
-                                            t))
-          (cond
-           ((match-beginning 1)
-            (setq nest (1+ nest))
-            )
-           ((match-beginning 2)
-            (setq nest (1- nest))
-            )
-           ((match-beginning 3)
-            (forward-line 1)
-            )
-           ((match-beginning 4)
-            (re-search-forward "^<'" lim 'move)
-            )
-           ((match-beginning 5)
-            (re-search-forward "\"" lim 'move)
-            )
-           )
-          (if (= 0 nest)
-              (throw 'skip (point)))
-          )
-        ;; if we reached this point then the search failed
-        (goto-char (point-max))
-        (throw 'skip (point)))
-      )
-    ))
+Return point of closer if we are in a scope, else move to end of
+buffer and return point."
+  (specman-up-scope)
+  (if (= (point) (point-min))
+      (goto-char (point-max))
+    (forward-sexp)
+    (backward-char)))
 
 (defun specman-within-ex-code-point ()
   "Return point if within ex-code region, else nil."
@@ -3072,7 +2974,7 @@ Key Bindings:
   "Move to start of statement and return point"
   (let* ((lim
           (save-excursion
-            (specman-up-scope within-code-region))
+            (specman-up-scope))
           )
          (found-statement-closer
           nil
@@ -3099,10 +3001,10 @@ Key Bindings:
                                     nil))
                                  ;; found a scope end
                                  ((match-beginning 2)
-                                  (specman-up-scope t))
+                                  (specman-up-scope))
                                  ;; found a parens closer
                                  ((match-beginning 3)
-                                  (specman-up-list t))
+                                  (specman-up-list))
                                  )))
                        found-statement-closer))
                 (progn
@@ -3274,7 +3176,7 @@ indentation change."
               (progn                     ;; indent normally
                 (goto-char parenloc)
                 (if (save-excursion                        ;; special case:
-                      (and (specman-up-list t)             ;; scope within a parens is a
+                      (and (specman-up-list)             ;; scope within a parens is a
                            (specman-safe-char= (char-after) ?\())) ;; list argument to a function
                     (back-to-indentation)                  ;; so indent according to last line
                   (goto-char (specman-beg-of-statement t)))  ;; normally indent to statement
@@ -3312,7 +3214,7 @@ indentation change."
                                   continue-flag
                                   (specman-re-search-backward "\\(,\\)\\|\\()\\)" parenloc t t))
                             (if (match-beginning 2)
-                                (specman-up-list t)
+                                (specman-up-list)
                               (progn
                                 (setq continue-flag nil)
                                 (setq result-point (point))))))
@@ -3455,7 +3357,7 @@ indentation change."
          
          (;; check if within paren
           (save-excursion
-            (setq pos (specman-up-list within-code-region)))
+            (setq pos (specman-up-list)))
           
           (specman-scope-offset pos)
           )
@@ -3463,7 +3365,7 @@ indentation change."
          (;; find scope start - common case.
           ;; always matches because specman-up-scope never returns nil
           (save-excursion
-            (setq pos (specman-up-scope within-code-region)))
+            (setq pos (specman-up-scope)))
           
           (specman-scope-offset pos)
           )
@@ -3596,7 +3498,7 @@ indentation change."
                   
                   (progn
                     (goto-char (match-beginning 0))
-                    (specman-up-scope t)
+                    (specman-up-scope)
                     
                     (let ((define-end-point (point))
                           )
@@ -3882,7 +3784,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
                     description-list)))
           )
          )
-        (specman-up-scope t)
+        (specman-up-scope)
         )
       
       (if description-list
