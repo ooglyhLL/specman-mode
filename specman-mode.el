@@ -5172,6 +5172,12 @@ the user to edit."
 ;; editing multi-line comments. The package can be installed from
 ;; ELPA (Emacs) or as part of the `text-modes' package (XEmacs).
 
+(eval-when-compile
+  ;; Silence byte-compiler warnings
+  (defvar filladapt-token-table)
+  (defvar filladapt-token-match-table)
+  (defvar filladapt-token-conversion-table))
+
 (eval-after-load "filladapt"
   ; The e comment token in the token table must appear before the bullet token
   ; since the bullet regexp include "-+". That's why we put it in the begining of
