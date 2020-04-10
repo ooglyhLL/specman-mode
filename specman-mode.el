@@ -54,9 +54,11 @@
   (message (concat "Specman Mode " specman-mode-version))
   )
 
-(add-hook 'speedbar-load-hook
-          (lambda ()
-            (speedbar-add-supported-extension ".e")))
+(eval-after-load "speedbar"
+  '(add-hook 'speedbar-load-hook
+             (lambda ()
+               (speedbar-add-supported-extension ".e"))))
+
 
 (require 'imenu)
 (require 'reporter)
