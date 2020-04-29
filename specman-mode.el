@@ -5187,8 +5187,36 @@ the user to edit."
      (setcar filladapt-token-table '("\\(--\\|//\\)-*" e-comment))
      (setcar filladapt-token-match-table '(e-comment e-comment))
      (setcar filladapt-token-conversion-table '(e-comment . exact)))
-)
+  )
 
+(defun specman--module-at-point ()
+  "Returns module path at point as string.
+
+Check whether POINT is inside an import statement and return the
+corresponding module path (with environment variables
+substituted). The resulting path will not be converted into an
+absolute path."
+  (when (save-excursion
+          (goto-char (specman-beg-of-statement))
+          (looking-at "import\\s-"))
+    (save-excursion
+      (let ((beg (goto-char (1+ (re-search-backward "[\n\t\r ,(]"))))
+            (end (1- (re-search-forward "[\n\t\r ,;)]"))))
+        ;; There is still the open issue regarding treatment of '.',
+        ;; '..', and '//'. However, this is unlikely going to be a
+        ;; problem in Real Life(TM), i.e. production code.
+        ;;
+        ;; Do *not* substitute undefined environment variables, but
+        ;; instead make it obvious that something's improperly
+        ;; configured.
+        (substitute-env-vars (buffer-substring beg end) t)))))
+
+;; GNU Global (ggtags from MELPA)
+(eval-after-load "ggtags"
+  '(add-hook 'specman-mode-hook
+             (lambda () (setq-local ggtags-include-pattern
+                                    #'specman--module-at-point)))
+  )
 
 ;;; specman-comment mode definition ends here
 ;; -----------------------------------------------------------------------------
