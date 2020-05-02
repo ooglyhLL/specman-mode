@@ -573,277 +573,10 @@ format (e.g. 09/17/1997) is not supported."
                  start-pos))
     (match-beginning 0)))
 
-
-;; =================================================
-;; SPECMAN SCOPE QUERIES
-;; =================================================
-
-(defvar global-scope-index nil
-  "Used as a global reference for cached refs to scopes for performance.
-Initialized for performace intensive operations without user interaction
-(e.g. region indentation) and must be cleared afterwards.")
-(make-variable-buffer-local 'global-scope-index)
-
-(defstruct scope-descriptor paren match parent paren-parent)
-
-(defun specman-create-scope-index ()
-  "Create a list of scope descriptors, each of which is a list of 3 members:
-scope, matching-scope and parent-scope-opener"
-
-  (save-excursion
-    (save-match-data
-      (let ((scope-index
-             nil
-             )
-            (scope-stack
-             nil
-             )
-            (paren-stack
-             nil
-             )
-            (buffer-end
-             (point-max)
-             )
-            (top-scope-opener
-             (point-min-marker)
-             )
-            (end-scope-closer
-             (point-max-marker)
-             )
-            (search-regexp
-             (concat                      "\\("
-                                          "{\\|("              "\\)\\|\\("
-                                          "}\\|)"              "\\)\\|\\("
-                                          "//\\|--"            "\\)\\|\\("
-                                          "^'>"                "\\)\\|\\("
-                                          "\""                 "\\)\\|\\("
-                                          "/\\*"               "\\)")
-             )
-            )
-        
-        (goto-char (point-min))
-
-        ;; for completeness - have a top pseudo-scope for the whole file
-        (set-marker-insertion-type top-scope-opener t)
-        (set-marker-insertion-type end-scope-closer t)
-        (push (cons top-scope-opener
-                    (make-scope-descriptor
-                     :paren  top-scope-opener
-                     :match  end-scope-closer
-                     :parent top-scope-opener
-                     :paren-parent nil))
-              scope-index)
-        
-        (when (re-search-forward "^<'" buffer-end t)
-          (while (and (< (point) buffer-end)
-                      (re-search-forward search-regexp buffer-end 'move))
-            
-            (cond
-             ;; new scope
-             ((match-beginning 1)
-
-              (save-excursion
-                (goto-char (match-beginning 1))
-                
-                (let* ((point-marker
-                        (point-marker)
-                        )
-                       (is-scope
-                        (looking-at "{")
-                        )
-                       (parent
-                        (if scope-stack
-                            (scope-descriptor-paren (car scope-stack))
-                          top-scope-opener)
-                        )
-                       (paren-parent
-                        (if paren-stack
-                            (scope-descriptor-paren (car paren-stack))
-                          nil)
-                        )
-                       (point-descriptor
-                        (make-scope-descriptor
-                         :paren  point-marker
-                         :match  end-scope-closer ;; place holder until the closer is found
-                         :parent parent
-                         :paren-parent paren-parent)
-                        )
-                       )
-                  (set-marker-insertion-type point-marker t)
-                  
-                  (push (cons point-marker
-                              point-descriptor)
-                        scope-index)
-                  (if is-scope
-                      (push point-descriptor scope-stack)
-                    (push point-descriptor paren-stack))))
-              )
-             ;; close scope
-             ((match-beginning 2)
-
-              (save-excursion
-                (goto-char (match-beginning 2))
-                
-                (let* ((point-marker
-                        (point-marker)
-                        )
-                       (is-scope
-                        (looking-at "}")
-                        )
-                       (has-match
-                        (if is-scope
-                            scope-stack
-                          paren-stack)
-                        )
-                       (match
-                        (when has-match
-                          (if is-scope
-                              (pop scope-stack)
-                            (pop paren-stack)))
-                        )
-                       (parent
-                        (if scope-stack
-                            (scope-descriptor-paren (car scope-stack))
-                          top-scope-opener)
-                        )
-                       (paren-parent
-                        (if paren-stack
-                            (scope-descriptor-paren (car paren-stack))
-                          nil)
-                        )
-                       )
-                  (set-marker-insertion-type point-marker t)
-                  
-                  (if has-match
-                      (let ((point-descriptor
-                             (make-scope-descriptor
-                              :paren  point-marker
-                              :match  (scope-descriptor-paren match)
-                              :parent parent
-                              :paren-parent paren-parent)
-                             )
-                            )
-                        (setf (scope-descriptor-match match) point-marker)
-                        
-                        (push (cons point-marker
-                                    point-descriptor)
-                              scope-index)
-                        )
-                    ;; currently no error checking for unmatched scopes - here for closing scope
-                    (progn
-                      (push (cons point-marker
-                                  (make-scope-descriptor
-                                   :paren  point-marker
-                                   :match  top-scope-opener
-                                   :parent parent
-                                   :paren-parent paren-parent))
-                            scope-index))
-                    )
-
-                  ;; TODO: clear any dangling open parens which aren't closed within the
-                  ;; scope being closed now.  nice idea, maybe should be explored more,
-                  ;; but doesn't work for now.
-                  
-                  ;;                 (when match
-                  ;;                   (let ((close-to-point
-                  ;;                          (scope-descriptor-paren match)
-                  ;;                          )
-                  ;;                         (stack-to-clear
-                  ;;                          (if is-scope
-                  ;;                              paren-stack
-                  ;;                            scope-stack)
-                  ;;                          )
-                  ;;                         (continue
-                  ;;                          t
-                  ;;                          )
-                  ;;                         )
-                  ;;                     (while (and continue
-                  ;;                                 stack-to-clear)
-                  ;;                       (if (< close-to-point
-                  ;;                              (scope-descriptor-paren (car stack-to-clear)))
-                  ;;                           (pop stack-to-clear)
-                  ;;                         (setq continue nil)))
-                  ;;                     ))
-                  ))
-              )
-             ;; comment
-             ((match-beginning 3)
-              
-              (forward-line 1)
-              )
-             ;; end e-code region
-             ((match-beginning 4)
-              
-              (re-search-forward "^<'" buffer-end 'move)
-              )
-             ;; string
-             ((match-beginning 5)
-
-              ;; to also consider the next character, for ""
-              (goto-char (match-beginning 0))
-              
-              (re-search-forward "\\(?:[^\\]\\|[\\][\\]\\)\"" buffer-end 'move)
-              )
-             ;; c multi-line comment
-             ((match-beginning 6)
-
-              (re-search-forward "\\*/" buffer-end 'move)
-              )
-             )
-            )
-          ;; currently no error checking for unmatched scopes - here for opening scope
-          )
-
-        ;; for aesthetic reasons - the list is arranged as a stack, so it is backward
-        (reverse scope-index)
-        ))))
-
-(defun specman-clear-scope-descriptor-and-key (key value)
-  "Clear a scope index entry.  Intended for use with maphash."
-  (let ((opener
-         (scope-descriptor-paren value))
-        (closer
-         (scope-descriptor-match value))
-        (parent
-         (scope-descriptor-parent value))
-        )
-    ;; some scope markers can be nil
-    (when key
-      (set-marker key nil))
-    (when opener
-      (set-marker opener nil))
-    (when closer
-      (set-marker closer nil))
-    (when parent
-      (set-marker parent nil))))
-
-
-(defun specman-clear-scope-index (scope-index)
-  "Clear a scope index by setting all markers to nil, so they no longer
-have an updating cost and the index itself to nil."
-  (while scope-index
-    (specman-clear-scope-descriptor-and-key (caar scope-index)
-                                            (cdar scope-index))
-    (setq scope-index
-          (cdr scope-index))))
-
-(defun specman-format-scope-descriptor-and-key (key value)
-  "format a scope index entry.  Intended for use with maphash."
-  (format "%d => <%d %d> %d^\n"
-          (marker-position key)
-          (marker-position (scope-descriptor-paren value))
-          (marker-position (scope-descriptor-match value))
-          (marker-position (scope-descriptor-parent value))))
-
-(defun specman-print-scope-index (scope-index)
-  "Print a scope index."
-  (if scope-index
-      (while scope-index
-        (specman-format-scope-descriptor-and-key (caar scope-index)
-                                                 (cdar scope-index))
-        (setq scope-index
-              (cdr scope-index)))
-    (message "Trying to print an empty scope-index.")))
+;; The implementation using a scope-index was replaced with Emacs' own
+;; syntax parsing functions. The function below was meant to be used
+;; by `specman-beg-of-defun'. When we turn to updating that one, the
+;; commented block below can go as well.
 
 ;; find the top containing scope - for specman-beg-of-defun
 ;; the problem is that it has worse performance than the current implementation.
@@ -910,17 +643,6 @@ have an updating cost and the index itself to nil."
 
 ;;   (point)
 ;;   )
-
-(defun specman-create-global-scope-index ()
-  (setq global-scope-index (specman-create-scope-index)))
-
-(defun specman-clear-global-scope-index ()
-  (specman-clear-scope-index global-scope-index)
-  (setq global-scope-index nil))
-
-(defun specman-print-global-scope-index ()
-  (specman-print-scope-index global-scope-index))
-
 
 ;; =================================================
 ;; SPECMAN SYNTAX TABLE
@@ -1076,7 +798,7 @@ have an updating cost and the index itself to nil."
     ;; return result
     index-alist))
 
-(defun specman-imenu-create-menu-for-region (reg-start reg-end scope-index-param)
+(defun specman-imenu-create-menu-for-region (reg-start reg-end)
   ;; function accepts a region because it is used recursively
 
   (let ((scope-regexp
@@ -1110,9 +832,6 @@ have an updating cost and the index itself to nil."
          nil)
         (field-alist
          nil)
-
-        (scope-index
-         scope-index-param)
         )
     
     (let ((common-regexp
@@ -1143,10 +862,6 @@ have an updating cost and the index itself to nil."
             "\\)"))
           )
 
-      (unless scope-index-param
-        (specman-create-global-scope-index)
-        (setq scope-index global-scope-index))
-      
       ;; containers and methods are inserted as they occur into the main list,
       ;; all other types get their own sub-menus.
       (save-excursion
@@ -1173,8 +888,7 @@ have an updating cost and the index itself to nil."
                                 (specman-imenu-create-menu-for-region
                                  (point)
                                  (save-excursion
-                                   (specman-down-scope))
-                                 scope-index)))
+                                   (specman-down-scope)))))
                     index-alist)
 
               (specman-down-scope)
@@ -1281,9 +995,6 @@ have an updating cost and the index itself to nil."
                 index-alist))
         )
 
-      (unless scope-index-param
-        (specman-clear-global-scope-index))
-      
       index-alist
       ))
   )
@@ -1304,7 +1015,7 @@ have an updating cost and the index itself to nil."
   (let (imenu
         )
     (message "Creating Specman-Index for Buffer")
-    (setq imenu (specman-imenu-create-menu-for-region (point-min) (point-max) nil))
+    (setq imenu (specman-imenu-create-menu-for-region (point-min) (point-max)))
     (message nil)
     imenu))
 
@@ -2798,8 +2509,6 @@ Key Bindings:
              nil)
             )
 
-        (specman-create-global-scope-index)
-        
         (goto-char beg-region)
         (beginning-of-line)
         (setq start-line-point (point))
@@ -2868,8 +2577,6 @@ Key Bindings:
               (forward-line 1))
             (forward-line 1))
           )
-
-        (specman-clear-global-scope-index)
         
         (goto-char start-line-point)
         ))
