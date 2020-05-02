@@ -8,7 +8,7 @@
 ;;               Scott Roland <scott.roland@verilab.com>
 ;;               Marcus Harnisch <marcus.harnisch@verilab.com>
 ;; Maintainer:   Marcus Harnisch <marcus.harnisch@verilab.com>
-;; Created:      Feb 02 2020
+;; Created:      May 02 2020
 
 ;; COPYRIGHT NOTICE
 ;;
@@ -844,62 +844,6 @@ have an updating cost and the index itself to nil."
         (setq scope-index
               (cdr scope-index)))
     (message "Trying to print an empty scope-index.")))
-
-(defun specman-scope-index-up-list (scope-index &optional within-code-region)
-  (let ((result
-         nil)
-        )
-    (when (specman-re-search-backward "\\((\\)\\|\\()\\|{\\|}\\)"
-                                      nil
-                                      t
-                                      within-code-region)
-      ;; at match-beginning 1 we're done, otherwise:
-      (if (match-beginning 2)
-          (let* ((point-marker
-                  (point-marker))
-                 (scope-descriptor
-                  (assoc point-marker
-                         scope-index))
-                 (parent-opener
-                  (when scope-descriptor
-                    (scope-descriptor-paren-parent (cdr scope-descriptor))))
-                 )
-            (set-marker point-marker nil)
-            (when parent-opener
-              (setq result (marker-position parent-opener))))
-        (setq result (point))
-        ))
-    (when result
-      (goto-char result))
-    result))
-
-(defun specman-scope-index-up-scope (scope-index &optional within-code-region)
-  (if (specman-re-search-backward "\\({\\)\\|\\(}\\|(\\|)\\)"
-                                  nil
-                                  t
-                                  within-code-region)
-      ;; at match-beginning 1 we're done, otherwise:
-      (when (match-beginning 2)
-        (let* ((point-marker
-                (point-marker))
-               (scope-descriptor
-                (assoc point-marker
-                       scope-index))
-               (parent-opener
-                (when scope-descriptor
-                  (scope-descriptor-parent (cdr scope-descriptor))))
-               )
-          (unless parent-opener
-            (error (print (format "scope - %d %d"
-                                  (point)
-                                  (if parent-opener
-                                      (marker-position parent-opener)
-                                    -1)))))
-          ;;(assert parent-opener)
-          (goto-char parent-opener)
-          (set-marker point-marker nil)))
-    (goto-char (point-min)))
-  (point))
 
 (defun specman-scope-index-down-scope (scope-index &optional within-code-region)
   (if (specman-re-search-forward "\\({\\|(\\|)\\)\\|\\(}\\)"
