@@ -845,42 +845,6 @@ have an updating cost and the index itself to nil."
               (cdr scope-index)))
     (message "Trying to print an empty scope-index.")))
 
-(defun specman-scope-index-down-scope (scope-index &optional within-code-region)
-  (if (specman-re-search-forward "\\({\\|(\\|)\\)\\|\\(}\\)"
-                                 (point-max)
-                                 t
-                                 within-code-region)
-      (progn
-        (backward-char)  ;; to be exactly on the paren
-        ;; at match-beginning 2 we're done, otherwise:
-        (when (match-beginning 1)
-          (let* ((point-marker
-                  (point-marker))
-                 (scope-descriptor
-                  nil)
-                 (parent-opener
-                  (progn
-                    (setq scope-descriptor
-                          (assoc point-marker
-                                 scope-index))
-                    (when scope-descriptor
-                      (scope-descriptor-parent (cdr scope-descriptor)))))
-                 (parent-closer
-                  (progn
-                    (when parent-opener
-                      (setq scope-descriptor
-                            (assoc parent-opener
-                                   scope-index))
-                      (when scope-descriptor
-                        (scope-descriptor-match (cdr scope-descriptor))))))
-                 )
-            (goto-char (if parent-closer
-                           parent-closer
-                         (point-max)))
-            (set-marker point-marker nil))))
-    (goto-char (point-max)))
-  (point))
-
 ;; find the top containing scope - for specman-beg-of-defun
 ;; the problem is that it has worse performance than the current implementation.
 ;; this can be solved by having the scope index refer to scope-descriptors
@@ -1209,11 +1173,11 @@ have an updating cost and the index itself to nil."
                                 (specman-imenu-create-menu-for-region
                                  (point)
                                  (save-excursion
-                                   (specman-scope-index-down-scope scope-index t))
+                                   (specman-down-scope))
                                  scope-index)))
                     index-alist)
 
-              (specman-scope-index-down-scope scope-index t)
+              (specman-down-scope)
               )
             )
            (;;  method
@@ -1264,7 +1228,7 @@ have an updating cost and the index itself to nil."
                                          (point-max)
                                          t
                                          t)
-              (specman-scope-index-down-scope scope-index t))
+              (specman-down-scope))
             )
            (;;  field
             (match-beginning 7)
@@ -1278,13 +1242,13 @@ have an updating cost and the index itself to nil."
             (match-beginning 8)
 
             ;; point is already beyond the opening paren
-            (specman-scope-index-down-scope scope-index t)
+            (specman-down-scope)
             )
            (;;  gen keeping - skip the scope to avoid confusion
             (match-beginning 9)
 
             ;; point is already beyond the opening paren
-            (specman-scope-index-down-scope scope-index t)
+            (specman-down-scope)
             )
            )
           )
