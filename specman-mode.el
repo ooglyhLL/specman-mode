@@ -5223,6 +5223,13 @@ absolute path."
 
 
 ;; -----------------------------------------------------------------------------
+;; The section below has not been reviewed recently and parts of it
+;; may be outdated. The section is left for reference.
+;;
+;; VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+
+
+;; -----------------------------------------------------------------------------
 ;; BUGS:
 ;; -----------------------------------------------------------------------------
 ;; - When closing } is on same line as container (e.g. foo() is {};) auto comment
