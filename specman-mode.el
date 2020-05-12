@@ -573,77 +573,6 @@ format (e.g. 09/17/1997) is not supported."
                  start-pos))
     (match-beginning 0)))
 
-;; The implementation using a scope-index was replaced with Emacs' own
-;; syntax parsing functions. The function below was meant to be used
-;; by `specman-beg-of-defun'. When we turn to updating that one, the
-;; commented block below can go as well.
-
-;; find the top containing scope - for specman-beg-of-defun
-;; the problem is that it has worse performance than the current implementation.
-;; this can be solved by having the scope index refer to scope-descriptors
-;; instead of markers, as it does now.  this will allow fast traversal of the
-;; scope index.
-;; TODO: one day...
-;;
-;; (defun specman-scope-index-top-scope (scope-index &optional within-code-region)
-;;   "Find the topmost scope point is contained in."
-;;   (if (specman-re-search-backward "\\({\\)\\|\\(}\\|(\\|)\\)"
-;;                                   nil
-;;                                   t
-;;                                   within-code-region)
-
-;;       (let ((continue
-;;              t)
-;;             (opener-position
-;;              (match-beginning 1))
-;;             (top-scope
-;;              (point-min))
-;;             )
-;;         (while continue
-;;           (let* ((point-marker
-;;                   (point-marker))
-;;                  (scope-descriptor
-;;                   (assoc point-marker
-;;                          scope-index))
-;;                  (current-opener
-;;                   (when scope-descriptor
-;;                     (if opener-position
-;;                         (scope-descriptor-paren (cdr scope-descriptor))
-;;                       (scope-descriptor-parent (cdr scope-descriptor)))))
-;;                  (parent-descriptor
-;;                   (when current-opener
-;;                     (assoc current-opener
-;;                            scope-index)))
-;;                  (parent-opener
-;;                   (when parent-descriptor
-;;                     (scope-descriptor-parent (cdr parent-descriptor))))
-;;                  )
-
-;;             (setq opener-position t)
-;;             (set-marker point-marker nil)
-
-;;             (unless parent-opener
-;; ;;               (error (print (format "scope - %d %d"
-;; ;;                                     (point)
-;; ;;                                     (if current-opener
-;; ;;                                         (marker-position current-opener)
-;; ;;                                       -1)))))
-;;               (setq continue nil)
-;;               (goto-char (point-min)))
-
-;;             (setq top-scope current-opener)
-;;             (goto-char parent-opener)
-;;             (when (equal (point)
-;;                          (point-min))
-;;               (setq continue nil))))
-
-;;         (goto-char top-scope))
-
-;;     (goto-char (point-min)))
-
-;;   (point)
-;;   )
-
 ;; =================================================
 ;; SPECMAN SYNTAX TABLE
 ;; =================================================
@@ -2252,48 +2181,36 @@ buffer and return point."
     )
   )
 
-(defconst specman-beg-of-defun-query-regexp
-  (concat
-   "^"
-   "\\(?:"
-   "\\(<'\\)"
-   "\\|"
-   specman-top-level-container-definition-regexp
-   "\\)"
-   )
-  "Internal - regexp used to find top level containter definitions.")
-
-(defun specman-beg-of-defun (&optional within-code-region
-                                       no-up-scope-call)
+(defun specman-beg-of-defun ()
   "Move backward to the beginning of the current struct or procedure,
    or failing that - to the beginning of the e-code section in the file."
   (interactive)
-  
-  ;; no-up-scope-call - only to be used from within specman-up-scope to prevent recursion.
-  ;; normally this should still give the same result (maybe a little slower), except
-  ;; within macros.
-  (unless no-up-scope-call
-    (specman-up-scope within-code-region))
-  
-  ;; a fairly decent approximate implementation. assumes that major definitions
-  ;; are properly indented to the beginning a line, so very little comment
-  ;; checking is needed.
+
+  ;; a fairly decent approximate implementation. assumes that major
+  ;; definitions are properly indented to the beginning of a line, so
+  ;; very little comment checking is needed.
   ;;
-  ;; TODO: the way this should really be done is by finding the
-  ;; top-most container - i.e. the one that calling specman-up-scope
-  ;; from reaches point-min.  this is very expensive in terms of
-  ;; performance currently, but can be solved by handling using the
-  ;; global-scope-index mechanism.  specman-scope-index-top-scope was
-  ;; an attempt to do that, but it's not mature yet.
-  (while (and
-          ;; failure means the beginning of the buffer was reached
-          (re-search-backward specman-beg-of-defun-query-regexp nil t)
-          ;; failure means a major definition was matched (i.e. (match-beginning 2) is true)
-          (match-beginning 1)
-          ;; failure means the beginning of the buffer was reached - success repeats the search
-          (re-search-backward "^'>" nil t)))
-  (point)
-  )
+  ;; Find top-scope opener and start scanning lines backwards for
+  ;; definitions.
+  (let ((top-scope-opener (syntax-ppss-toplevel-pos (syntax-ppss))))
+    (if (and top-scope-opener
+             (= (char-after top-scope-opener) ?\{))
+        (save-match-data
+          (goto-char top-scope-opener)
+          (beginning-of-line)
+
+          (while (and (not (looking-at specman-top-level-container-definition-regexp))
+                      (zerop (forward-line -1)))
+            (when (looking-at "^<'")
+              (specman-skip-backward-comment-or-string)))
+
+          (if (= (point) (point-min))
+              (forward-comment 1)
+            (point)))
+      (goto-char (point-min))
+      (forward-comment 1)
+      (point)
+      )))
 
 (defun specman-end-of-e-code ()
   "Move to the end of the e-code in this file."
@@ -2959,7 +2876,7 @@ indentation change."
         (save-excursion
           (specman-re-search-backward "\\(\\[\\)\\|\\([](){}]\\)"
                                       (save-excursion
-                                        (specman-beg-of-defun within-code-region))
+                                        (specman-beg-of-defun))
                                       t
                                       within-code-region))
 
