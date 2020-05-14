@@ -2215,24 +2215,25 @@ buffer and return point."
 (defun specman-end-of-e-code ()
   "Move to the end of the e-code in this file."
   (interactive)
-  
+
   (goto-char (point-max))
-  (re-search-backward "\\(^'>\\)" nil t)
+  (specman-skip-backward-comment-or-string)
   )
 
 (defun specman-end-of-defun ()
   "Move forward to the end of the current struct or procedure,
-   or failing that - to the end of the e-code section in the file."
+or failing that - to the end of the e-code section in the file."
   (interactive)
 
-  (specman-beg-of-defun)
-  (if (looking-at "<'")
-      (specman-end-of-e-code)
-    (progn
-      (specman-re-search-forward "{" (point-max) t)
-      (specman-down-scope))
-    )
-  )
+  ;; super-simple: locate nearest top-level scope opener and skip to
+  ;; matching closer. Don't check whether we are inside a "defun"
+  ;; since all standard ones are matched anyway.
+  (let ((top-scope-opener (syntax-ppss-toplevel-pos (syntax-ppss))))
+    (if (and top-scope-opener
+             (= (char-after top-scope-opener) ?\{))
+        (progn (goto-char top-scope-opener)
+               (forward-sexp 1))
+      (specman-end-of-e-code))))
 
 ;; =================================================
 
