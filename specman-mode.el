@@ -2503,62 +2503,46 @@ Key Bindings:
   (message nil)
   )
 
-(defun specman-beg-of-statement (&optional within-code-region)
+(defun specman-beg-of-statement ()
   "Move to start of statement and return point"
-  (let* ((lim
-          (save-excursion
-            (specman-up-scope))
-          )
-         (found-statement-closer
-          nil
-          )
-         (last
-          (save-excursion
-            ;; have to be careful here to prevent finding the end of the current
-            ;; statement/action but still not entering any new scope while checking that.
-            (specman-re-search-backward "[;)}]" (line-beginning-position) t within-code-region)
-            
-            (unless (looking-at ";")
-              (forward-char))
-            
-            (if (and (> (point) lim)
-                     (progn
-                       ;; look for a terminating ';' in the current scope
-                       (while
-                           (and (specman-re-search-backward "\\(;\\)\\|\\(\}\\)\\|\\(\)\\)" lim t t)
-                                (cond
-                                 ;; found a statement/action termination - stop with success
-                                 ((match-beginning 1)
-                                  (progn
-                                    (setq found-statement-closer t)
-                                    nil))
-                                 ;; found a scope end
-                                 ((match-beginning 2)
-                                  (specman-up-scope))
-                                 ;; found a parens closer
-                                 ((match-beginning 3)
-                                  (specman-up-list))
-                                 )))
-                       found-statement-closer))
-                (progn
-                  (forward-to-indentation 1)
-                  (specman-forward-ws)
-                  (point))
-              (progn
-                (goto-char lim)
-                (if (equal (point) ;; enter the scope
-                           (point-min))
-                    (re-search-forward "^<'" nil t)
-                  (forward-char 1))
-                (specman-forward-ws)
-                (forward-to-indentation 0)
-                (point))))
-          )
-         )
-    
-    last
-    )
-  )
+
+  ;; Starting from beginning of scope, search for last semicolon
+  ;; before `lim' if any. Then skip whitespace to beginning of
+  ;; statement that `lim' is part of.
+  (let* ((lim (point))
+         (state (syntax-ppss))
+         (depth-at-lim (nth 0 state))
+         (prev-semicolon-pos
+          ;; Move to beginning of scope, i.e. the first character
+          ;; after the opener or the beginning of the first code
+          ;; segment.
+          (progn
+            (if (= (specman-up-scope) (point-min))
+                (forward-comment 1) ; beginning of first code segment
+              (forward-char)) ; first character in same scope as pos
+            (point))))
+
+    (while (search-forward ";" lim t)
+      ;; when semicolon is part of a lower paren level, break out and
+      ;; continue. It wasn't the one we are looking for.
+      (let* ((state (syntax-ppss))
+             (depth-at-point (nth 0 state)))
+        (or
+         (when (> depth-at-point depth-at-lim)
+           ;; up-list should never error here
+           (up-list (- depth-at-point depth-at-lim) t t)
+           t)
+
+         ;; when a semicolon has been found inside string or comment,
+         ;; skip to end and continue
+         (specman-skip-forward-comment-or-string)
+
+         (setq prev-semicolon-pos (point)))
+        ))
+
+    (goto-char prev-semicolon-pos)
+    (specman-forward-ws)
+    (point)))
 
 
 ;; TODO: this, down to specman-add-syntax, doesn't seem to be in use
@@ -2712,7 +2696,7 @@ indentation change."
                       (and (specman-up-list)             ;; scope within a parens is a
                            (specman-safe-char= (char-after) ?\())) ;; list argument to a function
                     (back-to-indentation)                  ;; so indent according to last line
-                  (goto-char (specman-beg-of-statement t)))  ;; normally indent to statement
+                  (specman-beg-of-statement))  ;; normally indent to statement
                 (if (specman-safe-char= c ?\})
                     (current-column)
                   (+ (current-column) 
@@ -2798,7 +2782,7 @@ indentation change."
           (if (or (looking-at "//\\|--") ;; either comment
                   (eolp))                ;; or end-of-line
               (progn                     ;; indent normally
-                (goto-char (specman-beg-of-statement t))
+                (specman-beg-of-statement)
                 (if (specman-safe-char= c ?\])
                     (current-column)
                   (progn
@@ -2990,7 +2974,7 @@ indentation change."
           (beginning-of-line)
           (specman-up-scope)
           (setq scope-start (point))
-          (goto-char (specman-beg-of-statement))
+          (specman-beg-of-statement)
 
           (setq str
                 (cond 
@@ -3035,7 +3019,7 @@ indentation change."
                     
                     (let ((define-end-point (point))
                           )
-                      (goto-char (specman-beg-of-statement))
+                      (specman-beg-of-statement)
                       (concat "! "
                               (specman-prepared-buffer-substring (point)
                                                                  define-end-point))))
@@ -3290,7 +3274,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
       
       (while (> (point) (point-min))
         
-        (goto-char (specman-beg-of-statement t))
+        (specman-beg-of-statement)
         
         (cond
          ((looking-at container-name-regexp)
