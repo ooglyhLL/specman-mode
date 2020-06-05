@@ -2605,7 +2605,7 @@ indentation change."
             (set-marker (make-marker) (point))
             )
            (indent
-            (specman-get-offset within-code-region t)
+            (specman-get-offset)
             )
            (shift-amt
             (- indent
@@ -2831,74 +2831,24 @@ indentation change."
     )
   )
 
-(defun specman-get-offset (&optional within-code-region
-                                     out-of-string-quotes)
-  (let (pos
-        )
-    (save-excursion
-      (beginning-of-line)
-      
+(defun specman-get-offset ()
+  (save-excursion
+    (beginning-of-line)
+    (let ((state (syntax-ppss)))
+
       (cond
-       (;; line within string
-        ;; - out-of-string-quotes is an optimization to make sure that
-        ;;   specman-line-within-string-p isn't called more than once,
-        ;;   as it is expensive.
-        (and (not out-of-string-quotes)
-             (specman-line-within-string-p))
-        
-        0
-        )
-       
-       (;; scope starter/closer
-        (save-excursion
-          (beginning-of-line)
-          (looking-at "^[ \t]*\\(?:'>\\|<'\\)"))
+       ((nth 3 state) ;; line within string
+        0)
 
-        0
-        )
+       ((looking-at "^\\(?:'>\\|<'\\)") ;; ex-code starter/ender
+        0)
 
-       (;; search for relevant scope
-        (save-excursion
-          (specman-re-search-backward "\\(\\[\\)\\|\\([](){}]\\)"
-                                      (save-excursion
-                                        (specman-beg-of-defun))
-                                      t
-                                      within-code-region))
+       ((/= 0 (nth 0 state)) ;; line within parentheses construct
+        (specman-scope-offset (nth 1 state)))
 
-        (cond
-         (;; within square brackets
-          (match-beginning 1)
-          
-          (specman-scope-offset (match-beginning 1))
-          )
-         
-         (;; check if within paren
-          (save-excursion
-            (setq pos (specman-up-list)))
-          
-          (specman-scope-offset pos)
-          )
-         
-         (;; find scope start - common case.
-          ;; always matches because specman-up-scope never returns nil
-          (save-excursion
-            (setq pos (specman-up-scope)))
-          
-          (specman-scope-offset pos)
-          )
-         )
-        )
-
-       (;; corner case - not within any scope
-        t
-
-        0
-        )
-       )
-      )
-    )
-  )
-
+       (t ;; default case - not within any scope
+        0)
+       ))))
 
 ;; =================================================
 ;; SPECMAN - AUTO ENDCOMMENTS
