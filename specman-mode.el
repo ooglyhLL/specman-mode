@@ -2604,55 +2604,59 @@ Key Bindings:
 indentation change."
   (interactive)
 
-  (when (or within-code-region
-            (not (or (specman-within-string-p)
-                     ;; the case of un-indented scope opener, which otherwise
-                     ;; would be considered as being outside a code region.
-                     (save-excursion
-                       (beginning-of-line)
-                       (looking-at "[ \t]*<'"))
-                     (specman-within-region-comment-p))))
-    (let* ((start-position
-            (set-marker (make-marker) (point))
-            )
-           (indent
-            (specman-get-offset)
-            )
-           (shift-amt
-            (- indent
-               (current-indentation))
-            )
-           )
+  (save-restriction
+    (when (buffer-narrowed-p)
+      (widen))
 
-      (unless (zerop shift-amt)
-        (delete-region (line-beginning-position)
-                       (specman-indent-pos))
-        (beginning-of-line)
-        (indent-to indent))
+    (when (or within-code-region
+              (not (or (specman-within-string-p)
+                       ;; the case of un-indented scope opener, which otherwise
+                       ;; would be considered as being outside a code region.
+                       (save-excursion
+                         (beginning-of-line)
+                         (looking-at "[ \t]*<'"))
+                       (specman-within-region-comment-p))))
+      (let* ((start-position
+              (set-marker (make-marker) (point))
+              )
+             (indent
+              (specman-get-offset)
+              )
+             (shift-amt
+              (- indent
+                 (current-indentation))
+              )
+             )
 
-      ;; TODO: this section deals with moving the point forward to the
-      ;; new indentation when applicable.  most of the times the
-      ;; function is called this isn't needed and just wastes
-      ;; performance.  attempting to remove this didn't work well,
-      ;; maybe because it's the indentation function for the mode.
-      ;; (will replacing it with specman-indent-line-keep-pos solve
-      ;; the problem?)
-      (unless within-code-region
-        (if (< (point)
-               (specman-indent-pos))
-            (back-to-indentation)
-          ;; If initial point was within line's indentation, position after
-          ;; the indentation.  Else stay at same point in text.
-          (when (< (point) start-position)
-            (goto-char start-position))))
-      
-      (set-marker start-position nil)
-      (run-hooks 'specman-special-indent-hook)
-      
-      indent
+        (unless (zerop shift-amt)
+          (delete-region (line-beginning-position)
+                         (specman-indent-pos))
+          (beginning-of-line)
+          (indent-to indent))
+
+        ;; TODO: this section deals with moving the point forward to the
+        ;; new indentation when applicable.  most of the times the
+        ;; function is called this isn't needed and just wastes
+        ;; performance.  attempting to remove this didn't work well,
+        ;; maybe because it's the indentation function for the mode.
+        ;; (will replacing it with specman-indent-line-keep-pos solve
+        ;; the problem?)
+        (unless within-code-region
+          (if (< (point)
+                 (specman-indent-pos))
+              (back-to-indentation)
+            ;; If initial point was within line's indentation, position after
+            ;; the indentation.  Else stay at same point in text.
+            (when (< (point) start-position)
+              (goto-char start-position))))
+        
+        (set-marker start-position nil)
+        (run-hooks 'specman-special-indent-hook)
+        
+        indent
+        )
       )
-    )
-  )
+    ))
 
 (defun specman-scope-offset (parenloc)
   "determine the amount to indent code based on the enclosing scope."
