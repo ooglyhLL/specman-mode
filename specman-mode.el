@@ -658,31 +658,42 @@ format (e.g. 09/17/1997) is not supported."
   ;;   ("\\(?:\\(?3:\\(?:.\\|\n\\)\\'\\)\\|^<'\\s-*\\(?3:\n\\)\\)" (3 "!")) ;; ex-code end
   ;;   )
   (lambda (start end)
-   (goto-char start)
-   (while (and (< (point) end) (re-search-forward
-                                "\\(?2:\\`<\\)'\\s-*\\(?3:
+    ;; the regexp contains references to the beginning of buffer,
+    ;; which is affected by narrowing. Temporarily widen the buffer
+    ;; and adjust START and END accordingly, before applying the
+    ;; regexp search.
+    (save-restriction
+      (let ((start start)
+            (end end))
+        (when (buffer-narrowed-p)
+          (widen)
+          (setq start (+ (point-min) (1- start))
+                end   (+ (point-min) (1- end)))
+          )
+        (goto-char start)
+        (while (and (< (point) end) (re-search-forward
+                                     "\\(?2:\\`<\\)'\\s-*\\(?3:
 \\)\\|\\(?:\\(?3:\\(?:.\\|
 \\)\\'\\)\\|^<'\\s-*\\(?3:
 \\)\\)\\|\\(?:\\(?2:\\`\\(?:.\\|
 \\)\\)\\|\\(?2:^'\\)>\\)\\|\\(?:\\(?1:-\\)-\\|\\(?1:/\\)/\\)" end t))
-     ;; Group 1 is exclusive, groups 2 and 3 can be matched together.
-     (if (match-beginning 1)
-         (put-text-property (match-beginning 1)
-                            (match-end 1)
-                            'syntax-table
-                            '(11))
-       (if (match-beginning 2)
-           (put-text-property (match-beginning 2)
-                              (match-end 2)
-                              'syntax-table
-                              '(14)))
-       (if (match-beginning 3)
-           (put-text-property (match-beginning 3)
-                              (match-end 3)
-                              'syntax-table
-                              '(14))))
-     )))
-
+          ;; Group 1 is exclusive, groups 2 and 3 can be matched together.
+          (if (match-beginning 1)
+              (put-text-property (match-beginning 1)
+                                 (match-end 1)
+                                 'syntax-table
+                                 '(11))
+            (if (match-beginning 2)
+                (put-text-property (match-beginning 2)
+                                   (match-end 2)
+                                   'syntax-table
+                                   '(14)))
+            (if (match-beginning 3)
+                (put-text-property (match-beginning 3)
+                                   (match-end 3)
+                                   'syntax-table
+                                   '(14))))
+          )))))
 
 ;; =================================================
 ;; SPECMAN IMENU FEATURE
