@@ -25,6 +25,10 @@ Notable features:
 
 * Automatic header generation and insertion
 
+* Uses Emacs’ syntax parsing facilities for traversing source
+  code. This has a significant impact on ``specman-mode``’s code size
+  as well as performance of e.g. indentation.
+
 
 Installation
 ============
@@ -45,11 +49,10 @@ Compatibility
 Historically, specman-mode used to work in both Emacs and XEmacs
 (possibly SXEmacs, too). Development for the latter two projects has
 slowed down a lot, while at the same time the pace of Emacs
-development increased quite a bit. Some newer features in Emacs that
-specman-mode is starting to take advantage of may not have been ported
-to (S)XEmacs, yet.
+development increased quite a bit.
 
-When this document refers to “Emacs”, the other two (or in fact any
-other Emacs implementation) aren't necessarily excluded.
-
-
+``specman-mode`` has started to rely on Emacs’s syntax parsing
+facilities which so far have only been partially ported to XEmacs,
+yet. In particular the ``syntax-table`` text property is currently
+only available in Emacs, as well as the syntax class “generic comment
+delimiter” which is used to delimit space between code segments.
