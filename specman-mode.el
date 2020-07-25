@@ -54,105 +54,27 @@
   (message (concat "Specman Mode " specman-mode-version))
   )
 
-(add-hook 'speedbar-load-hook
-          (lambda ()
-            (speedbar-add-supported-extension ".e")))
+(eval-after-load "speedbar"
+  '(add-hook 'speedbar-load-hook
+             (lambda ()
+               (speedbar-add-supported-extension ".e"))))
 
-(defmacro specman-safe (&rest body)
-  "Safely execute BODY, return nil if an error occurred."
-  `(condition-case nil
-       (progn ,@body)
-     (error nil)))
+(eval-when-compile
+  (require 'cl))
 
-(if (fboundp 'eval-when-compile)
-    (eval-when-compile
-      (condition-case nil
-          (require 'cl)  ;; FSF emacs's imenu needs cl, but doesn't (require 'cl)
-        (error nil))
-      (condition-case nil
-          (require 'imenu)
-        (error nil))
-      (condition-case nil
-          (unless (fboundp 'imenu-add-to-menubar)
-            (defun imenu-add-to-menubar (a) ))
-        (error nil))
-      (condition-case nil
-          (require 'reporter)
-        (error nil))
-      (condition-case nil
-          (if (boundp 'current-menubar)
-              nil ;; great
-            (defmacro set-buffer-menubar (&rest args) nil)
-            (defmacro add-submenu (&rest args) nil))
-        (error nil))
-      (condition-case nil
-          (require 'func-menu)
-        (error nil))
-      (condition-case nil
-          (unless (fboundp 'char=)
-            (defun char= (a b)
-              (= a b)))
-        (error nil))
-      (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
-          nil ;; We've got what we needed
-        ;; We have the old custom-library, hack around it!
-        (defmacro defgroup (&rest args)  nil)
-        (defmacro customize (&rest args)
-          (message "Sorry, Customize is not available with this version of emacs"))
-        (defmacro defcustom (var value doc &rest args)
-          `(defvar ,var ,value , doc))
-        )
-      (if (fboundp 'defface)
-          nil ;; great!
-        (defmacro defface (var value doc &rest args)
-          `(make-face ,var))
-        )
-      (if (and (featurep 'custom) (fboundp 'customize-group))
-          nil ;; We've got what we needed
-        ;; We have an intermediate custom-library, hack around it!
-        (defmacro customize-group (var &rest args)
-          `(customize ,var) )
-        )
-      (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
-          nil ;; We've got what we needed
-        ;; We have the old custom-library, hack around it!
-        (defmacro defgroup (&rest args)  nil)
-        (defmacro customize (&rest args)
-          (message "Sorry, Customize is not available with this version of emacs"))
-        (defmacro defcustom (var value doc &rest args)
-          `(defvar ,var ,value , doc))
-        )
-      
-      (if (and (featurep 'custom) (fboundp 'customize-group))
-          nil ;; We've got what we needed
-        ;; We have an intermediate custom-library, hack around it!
-        (defmacro customize-group (var &rest args)
-          `(customize ,var) )
-        )
-      (condition-case nil
-          (require 'easymenu)
-        (error nil))))
+(require 'imenu)
+(require 'reporter)
+(require 'easymenu)
 
-;; If you install xemacs-devel, you will get a 10-20% speedup.
-;; if not, you get this:
-(unless (fboundp 'regexp-opt)
-  (defun regexp-opt (strings &optional paren)
-    (let ((open (if paren "\\(" ""))
-          (close (if paren "\\)" ""))
-          )
-      (concat open (mapconcat 'regexp-quote strings "\\|") close))))
-
-;; TODO: this is also defined above, not sure why
-(unless (fboundp 'char=)
-  (defun char= (a b)
-    (= a b)))
-
-(if (not (boundp 'imenu-generic-expression))
-    (defvar imenu-generic-expression))
-
-(unless (boundp 'font-lock-constant-face)
-  (make-face 'font-lock-constant-face)
-  (set-face-foreground 'font-lock-constant-face "CadetBlue"))
+(eval-and-compile
+  (if (featurep 'xemacs)
+      (defalias 'specman--char= 'char=) ; XEmacs
+    (defalias 'specman--char= '=))      ; FSF Emacs
+  )
+(eval-when-compile
+  ;; Try hard to inline the alias as efficiently as possible
+  ;; (see https://nullprogram.com/blog/2019/12/10/)
+  (put 'specman--char= 'byte-optimizer 'byte-compile-inline-expand))
 
 (if (< max-specpdl-size 3000) 
     (setq max-specpdl-size 3000))
@@ -183,6 +105,16 @@
   "*Indentation of continued Specman statements with respect to first line of statement."
   :group 'specman-mode
   :type 'integer
+  )
+
+(defcustom specman-default-line-comment-starter "--"
+  "*Default character sequence to start line comments.
+
+Used in comment inserting functions and for creating comments
+from templates."
+  :group 'specman-mode
+  :type '(choice (const :tag "-- (VHDL)" "--")
+                 (const :tag "// (Verilog)" "//"))
   )
 
 (defcustom specman-auto-newline nil
@@ -239,14 +171,16 @@
   :group 'specman-mode
   )
 
-(defcustom specman-compile-command "${SPECMAN_HOME}/bin/sn_compile.sh "
+(defcustom specman-compile-command "${SPECMAN_HOME}/bin/sn_compile.sh"
   "String used to compile e files."
   :group 'specman-mode
+  :type 'string
   )
 
-(defcustom specman-make-command "/usr/bin/make "
+(defcustom specman-make-command "/usr/bin/make"
   "String used to invoke make"
   :group 'specman-mode
+  :type 'string
   )
 
 (defcustom specman-index-menu-active t
@@ -383,29 +317,34 @@ format (e.g. 09/17/1997) is not supported."
 (defconst specman-number-regexp
   (concat
    "\\("
-
-   ;; this is ugly, but the only way I could find to count + and - as
-   ;; number symbols but maintaining that numbers have to come after
-   ;; a symbol beginning
-   "\\(?:"
-   "[+-]"
-   "\\|"
    specman-symbol-begin-regexp
-   "\\)"
-   
    "\\(?:"
-   "[0-9]+"
+   "\\(?:"
+   "0b[01_]+" ;; unsized binary
    "\\|"
-   "0b[01]+"
+   "0o[0-7_]+" ;; unsized octal
    "\\|"
-   "0o[0-7]+"
+   "0x[0-9a-fA-F_]+" ;; unsized hexadecimal
    "\\|"
-   "0[xh][0-9a-fA-F]+"
+   "[0-9]+'[bB][01hHlLnNuUwWxXzZ_]+" ;; sized binary (incl MVL)
+   "\\|"
+   "[0-9]+'[oO][0-7hHlLnNuUwWxXzZ_]+" ;; sized octal (incl MVL)
+   "\\|"
+   "[0-9]+'[xXhH][0-9a-fA-FhHlLnNuUwWxXzZ_]+" ;; sized hexadecimal (incl MVL)
+   "\\|"
+   "[0-9]+'[dD][0-9][0-9_]*" ;; sized decimal
+   "\\|"
+   "-?[0-9_]+\\(?:\\.[0-9_]+\\)?\\(?:[eE][+-]?[0-9]+\\)?" ; real
+   "\\|"
+   "-?[0-9_]+[kKmM]?" ;; unsized decimal (last, so it won't hide other literals)
    "\\)"
-   
-   "[kKmM]?"
+   specman-symbol-end-regexp
    "\\)"
-   specman-symbol-end-regexp)
+   "\\|"
+   ;; match literal character (printable ASCII plus a few escape seqs)
+   "0c\"\\(?:[ -Z^-~]\\|[][]\\|\\\\[fntr\\\"]\\)\""
+   "\\)"
+   )
   "Regexp that identifies numbers (arg1)")
 
 
@@ -449,6 +388,33 @@ format (e.g. 09/17/1997) is not supported."
 ;; =================================================
 ;; SPECMAN SEARCHES AND QUERIES
 ;; =================================================
+
+(defsubst specman-within-comment-p ()
+  (or (specman-within-line-comment-p)
+      (specman-within-region-comment-p))
+  )
+
+(defsubst specman-empty-line-p ()
+  (looking-at "^[ \t]*$"))
+
+(defun specman-within-string-p ()
+  (save-excursion
+    (nth 3 (parse-partial-sexp (point-min) (point)))))
+
+(defsubst specman-line-within-string-p ()
+  (save-excursion
+    (beginning-of-line)
+    (specman-within-string-p)))
+
+(defsubst specman-prepared-buffer-substring (beg end)
+  "Remove extra spaces and new-lines from strings."
+  (save-match-data
+    (replace-regexp-in-string "[ \t\n]+"
+                              " "
+                              (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
+                                                        ""
+                                                        (buffer-substring beg
+                                                                          end)))))
 
 (defsubst specman-re-search-forward (REGEXP BOUND NOERROR &optional within-code-region)
   "Like re-search-forward, but skips over matches in comments or strings"
@@ -554,7 +520,7 @@ format (e.g. 09/17/1997) is not supported."
                     ;; NOTE: this approach is more elegant, but slower than the code below
                     ;;(if (specman-within-string-p)
                     ;;    (re-search-backward "[^\\]\"" BOUND 'move)
-                    ;;  (re-search-backward "//\\|--" (specman-beg-of-line-pos) 'move))
+                    ;;  (re-search-backward "//\\|--" (line-beginning-position) 'move))
                     (when (save-match-data
                             (back-to-indentation)
                             (re-search-forward "\\(//\\|--\\)\\|\\([^\\]\"\\)" (match-beginning 2) 'move)
@@ -587,7 +553,7 @@ format (e.g. 09/17/1997) is not supported."
                       ;; if a comment is not found then point is left on the
                       ;; beginning of the line but the goto-char below fixes this.
                       ;; note: the while checks that the comment prefix is not in a string
-                      (while (and (re-search-backward "//\\|--" (specman-beg-of-line-pos) 'move)
+                      (while (and (re-search-backward "//\\|--" (line-beginning-position) 'move)
                                   (if (specman-within-string-p)
                                       t
                                     (progn
@@ -607,50 +573,6 @@ format (e.g. 09/17/1997) is not supported."
                    (match-beginning 0)
                  start-pos))
     (match-beginning 0)))
-
-(defsubst specman-beg-of-line-pos ()
-  (save-excursion
-    (beginning-of-line)
-    (point)))
-
-(defsubst specman-end-of-line-pos ()
-  (save-excursion
-    (end-of-line)
-    (point)))
-
-(defsubst specman-within-comment-p ()
-  (or (specman-within-line-comment-p)
-      (specman-within-region-comment-p))
-  )
-
-(defsubst specman-empty-line-p ()
-  (looking-at "^[ \t]*$"))
-
-(defun specman-within-string-p ()
-  (save-excursion
-    (nth 3 (parse-partial-sexp (point-min) (point)))))
-
-(defsubst specman-line-within-string-p ()
-  (save-excursion
-    (beginning-of-line)
-    (specman-within-string-p)))
-
-(defsubst specman-prepared-buffer-substring (beg end)
-  "Remove extra spaces and new-lines from strings."
-  (save-match-data
-    (if (eq specman-emacs-kind 'emacs)
-        (replace-regexp-in-string "[ \t\n]+"
-                                  " "
-                                  (replace-regexp-in-string "^[ \t\n]+\\|[ \t\n]+$"
-                                                            ""
-                                                            (buffer-substring beg
-                                                                              end)))
-      (replace-in-string (replace-in-string (buffer-substring beg
-                                                              end)
-                                            "^[ \t\n]+\\|[ \t\n]+$"
-                                            "")
-                         "[ \t\n]+"
-                         " "))))
 
 
 ;; =================================================
@@ -1097,108 +1019,6 @@ have an updating cost and the index itself to nil."
 ;; SPECMAN SYNTAX TABLE
 ;; =================================================
 
-(defconst specman-emacs-features
-  (let ((major (and (boundp 'emacs-major-version)
-                    emacs-major-version))
-        (minor (and (boundp 'emacs-minor-version)
-                    emacs-minor-version))
-        flavor comments )
-    ;; figure out version numbers if not already discovered
-    (and (or (not major) (not minor))
-         (string-match "\\([0-9]+\\).\\([0-9]+\\)" emacs-version)
-         (setq major (string-to-int (substring emacs-version
-                                               (match-beginning 1)
-                                               (match-end 1)))
-               minor (string-to-int (substring emacs-version
-                                               (match-beginning 2)
-                                               (match-end 2)))))
-    (if (not (and major minor))
-        (error "Cannot figure out the major and minor version numbers."))
-    ;; calculate the major version
-    (cond
-     ((= major 4)  (setq major 'v18))   ;Epoch 4
-     ((= major 18) (setq major 'v18))   ;Emacs 18
-     ((= major 19) (setq major 'v19     ;Emacs 19
-                         flavor (if (or (string-match "Lucid" emacs-version)
-                                        (string-match "XEmacs" emacs-version))
-                                    'XEmacs 'FSF)))
-     ((> major 19) (setq major 'v20
-                         flavor (if (or (string-match "Lucid" emacs-version)
-                                        (string-match "XEmacs" emacs-version))
-                                    'XEmacs 'FSF)))
-     ;; I don't know
-     (t (error "Cannot recognize major version number: %s" major)))
-    ;; XEmacs 19 uses 8-bit modify-syntax-entry flags, as do all
-    ;; patched Emacs 19, Emacs 18, Epoch 4's.  Only Emacs 19 uses a
-    ;; 1-bit flag.  Let's be as smart as we can about figuring this
-    ;; out.
-    (if (or (eq major 'v20) (eq major 'v19))
-        (let ((table (copy-syntax-table)))
-          (modify-syntax-entry ?a ". 12345678" table)
-          (cond
-           ;; XEmacs pre 20 and Emacs pre 19.30 use vectors for syntax tables.
-           ((vectorp table)
-            (if (= (logand (lsh (aref table ?a) -16) 255) 255)
-                (setq comments '8-bit)
-              (setq comments '1-bit)))
-           ;; XEmacs 20 is known to be 8-bit
-           ((eq flavor 'XEmacs) (setq comments '8-bit))
-           ;; Emacs 19.30 and beyond are known to be 1-bit
-           ((eq flavor 'FSF) (setq comments '1-bit))
-           ;; Don't know what this is
-           (t (error "Couldn't figure out syntax table format."))
-           ))
-      ;; Emacs 18 has no support for dual comments
-      (setq comments 'no-dual-comments))
-    ;; lets do some minimal sanity checking.
-    (if (or
-         ;; Lemacs before 19.6 had bugs
-         (and (eq major 'v19) (eq flavor 'XEmacs) (< minor 6))
-         ;; Emacs 19 before 19.21 has known bugs
-         (and (eq major 'v19) (eq flavor 'FSF) (< minor 21))
-         )
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "The version of Emacs that you are running, %s,
-has known bugs in its syntax parsing routines which will affect the
-performance of specman-mode. You should strongly consider upgrading to the
-latest available version.  Specman-mode may continue to work, after a
-fashion, but strange indentation errors could be encountered."
-                  emacs-version))))
-    ;; Emacs 18, with no patch is not too good
-    (if (and (eq major 'v18) (eq comments 'no-dual-comments))
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "The version of Emacs 18 you are running, %s,
-has known deficiencies in its ability to handle the dual specman
-comments, [e.g. the // and -- comments]. You really should strongly
-consider upgrading to one of the latest Emacs 19\'s.  In Emacs 18, you
-may also experience performance degradations.  Emacs 19 has some new
-built-in routines which will speed things up for you.  Because of
-these inherent problems, specman-mode is not supported on emacs-18."
-                  emacs-version))))
-    ;; Emacs 18 with the syntax patches are no longer supported
-    (if (and (eq major 'v18) (not (eq comments 'no-dual-comments)))
-        (with-output-to-temp-buffer "*specman-mode warnings*"
-          (print (format
-                  "You are running a syntax patched Emacs 18 variant.  While this should
-work for you, you may want to consider upgrading to Emacs 19.
-The syntax patches are no longer supported either for specman-mode."))))
-    (list major comments ))
-  "A list of features extant in the Emacs you are using.
-There are many flavors of Emacs out there, each with different
-features supporting those needed by specman-mode.  Here's the current
-supported list, along with the values for this variable:
-
- Vanilla Emacs 18/Epoch 4:   (v18 no-dual-comments flock-syntax-before-1930)
- Emacs 18/Epoch 4 (patch2):  (v18 8-bit flock-syntax-after-1930)
- XEmacs (formerly Lucid) 19: (v19 8-bit flock-syntax-after-1930)
- XEmacs >= 20:               (v20 8-bit flock-syntax-after-1930)
- Emacs 19.1-19.30:           (v19 8-bit flock-syntax-before-1930)
- Emacs 19.31-19.xx:          (v19 8-bit flock-syntax-after-1930)
- Emacs >=20:                 (v20 1-bit flock-syntax-after-1930)."
-  )
-
 (defun specman-populate-syntax-table (table)
   (modify-syntax-entry ?_  "w"        table)  ;; underscore is a part of words
   (modify-syntax-entry ?{  "(}"       table)
@@ -1226,42 +1046,32 @@ supported list, along with the values for this variable:
   ;; instead, the second comment style /*...*/ is used, although
   ;; it is only a valid syntax in the context of c routines.
   
-  (cond
-   ((memq '8-bit specman-emacs-features)
-    ;; XEmacs (formerly Lucid) has the best implementation
-    
-    ;;    (modify-syntax-entry ?/  ". 12" table)
-    ;;    (modify-syntax-entry ?-  ". 56" table)
-    ;;    (modify-syntax-entry ?\n "> 37" table)
-    ;;    (modify-syntax-entry ?\f "> 37" table)
-    (modify-syntax-entry ?/  ". 1258" table)
-    (modify-syntax-entry ?*  ". 67" table)
-    (modify-syntax-entry ?\n "> 3" table)
-    (modify-syntax-entry ?\f "> 3" table)
-    )
-   ((memq '1-bit specman-emacs-features)
-    ;; Emacs 19 does things differently, but we can work with it
-    
-    ;;    (modify-syntax-entry ?/  ". 12" table)
-    ;;    (modify-syntax-entry ?\n ">"    table)
-    ;;    (modify-syntax-entry ?\f ">"    table)
-    ;;    (modify-syntax-entry ?-  "< 12b" table)
-    ;;    (modify-syntax-entry ?\n "> b"    table)
-    ;;    (modify-syntax-entry ?\f "> b"    table)
-    (modify-syntax-entry ?/  ". 124" table)
-    (modify-syntax-entry ?*  ". 23b" table)
-    (modify-syntax-entry ?\n ">"    table)
-    (modify-syntax-entry ?\f ">"    table)
-    ))
+  (if (featurep 'xemacs)
+      ;; XEmacs has the best implementation
+      (progn
+        ;;    (modify-syntax-entry ?/  ". 12" table)
+        ;;    (modify-syntax-entry ?-  ". 56" table)
+        ;;    (modify-syntax-entry ?\n "> 37" table)
+        ;;    (modify-syntax-entry ?\f "> 37" table)
+        (modify-syntax-entry ?/  ". 1258" table)
+        (modify-syntax-entry ?*  ". 67" table)
+        (modify-syntax-entry ?\n "> 3" table)
+        (modify-syntax-entry ?\f "> 3" table)
+        )
+    ;; Emacs does things differently, but we can work with it
+    (progn
+      ;;    (modify-syntax-entry ?/  ". 12" table)
+      ;;    (modify-syntax-entry ?\n ">"    table)
+      ;;    (modify-syntax-entry ?\f ">"    table)
+      ;;    (modify-syntax-entry ?-  "< 12b" table)
+      ;;    (modify-syntax-entry ?\n "> b"    table)
+      ;;    (modify-syntax-entry ?\f "> b"    table)
+      (modify-syntax-entry ?/  ". 124" table)
+      (modify-syntax-entry ?*  ". 23b" table)
+      (modify-syntax-entry ?\n ">"    table)
+      (modify-syntax-entry ?\f ">"    table)
+      ))
   )
-
-(defvar specman-emacs-kind nil)
-
-;; emacs or xemacs
-(if (or (string-match "Lucid" emacs-version)
-        (string-match "XEmacs" emacs-version))
-    (setq specman-emacs-kind 'xemacs)
-  (setq specman-emacs-kind 'emacs))
 
 
 ;; =================================================
@@ -1544,28 +1354,13 @@ supported list, along with the values for this variable:
 ;; SPECMAN UTILITY
 ;; =================================================
 
-;; Macros
-(defmacro inc (num &optional val) 
-  "increment the value of num"
-  (setq num (+ num (or val 1))))
+(defun specman-safe-char= (a b)
+  "Return t if both A and B are equal
 
-(defmacro for (var from init to final do &rest body)
-  "Execute a simple \"for\" loop, e.g.,
-    (for i from 1 to 10 do (print i))."
-  ;;  '(let ((,var ,init))
-  ;;     (while (<= ,var ,final)
-  ;;       ,(append body
-  ;;                (setq ,var (+ 1 ,var))))))
-  (list 'let (list (list var init))
-        (cons 'while 
-              (cons (list '<= var final)
-                    (append body (list (list 'setq var (list '+ '1 var))))))))
-
-(defun safe-char= (a b)
-  "Safe execution of char= which can accept-nil"
+The arguments to A and B may be characters or nil."
   (or (and a
            b
-           (char= a b))
+           (specman--char= a b))
       (not (or a
                b))
       )
@@ -1797,24 +1592,24 @@ to context."
   (interactive)
   ;; if we are inside a string, delete one char
   (let ((start-with-space
-         (safe-char= (char-before) ?\  )
+         (specman-safe-char= (char-before) ?\  )
          )
         )
-    (delete-backward-char 1)
+    (delete-char -1)
     (if (and (not (specman-within-string-p))
              start-with-space)
         (while (and (not (eq (% (current-column) 
                                 specman-tab-width)
                              0))
-                    (safe-char= (char-before) ?\  ))
-          (delete-backward-char 1)))))
+                    (specman-safe-char= (char-before) ?\  ))
+          (delete-char -1)))))
 
 (defun specman-kill-entire-line ()
   "Kill entire line and indent"
   (interactive)
-  (if (eq specman-emacs-kind 'emacs)
-      (kill-whole-line)
-    (kill-entire-line))
+  (if (featurep 'xemacs)
+      (kill-entire-line)
+    (kill-whole-line))
   (specman-activate-indent)
   )
 
@@ -2787,7 +2582,6 @@ See also `specman-font-lock-extra-types'.")
                                             lim
                                             'move
                                             t))
-          (setq tb (char-syntax (char-before)))
           (cond
            ((match-beginning 1)
             (setq nest (1+ nest))
@@ -2983,7 +2777,7 @@ See also `specman-font-lock-extra-types'.")
 ;; =================================================
 ;; SPECMAN Menus
 ;; =================================================
-(defvar specman-xemacs-menu
+(defvar specman-emacs-menu
   '("Specman"
     ("Move"
      ["Beginning of specification"                      specman-beg-of-defun t]
@@ -3027,12 +2821,11 @@ See also `specman-font-lock-extra-types'.")
   "Emacs menu for SPECMAN mode."
   )
 
-(unless (string-match "XEmacs" emacs-version)
-  (easy-menu-define
-    specman-menu
-    specman-mode-map
-    "Menu for Specman mode"
-    specman-xemacs-menu))
+(easy-menu-define
+  specman-menu
+  specman-mode-map
+  "Menu for Specman mode"
+  specman-emacs-menu)
 
 (defun specman-customize ()
   "Link to customize screen for Specman"
@@ -3050,7 +2843,7 @@ See also `specman-font-lock-extra-types'.")
   "Invoke compile, customized for specman"
   (interactive)
   (let ((compile-command
-         (concat specman-compile-command
+         (concat specman-compile-command " "
                  buffer-file-name))
         (compilation-read-command
          t)
@@ -3219,7 +3012,6 @@ Key Bindings:
   (make-local-variable 'comment-start-skip)
   (make-local-variable 'comment-column)
   (make-local-variable 'normal-auto-fill-function)
-  (make-local-variable 'indent-region-function)
   (make-local-variable 'comment-indent-function)
   (setq comment-indent-function 'specman-comment-indent)
   (setq comment-start "// "
@@ -3228,7 +3020,7 @@ Key Bindings:
         comment-column 48
         comment-multi-line t
         ;;normal-auto-fill-function 'specman-do-auto-fill ;; TODO: someday...
-        indent-region-function 'specman-indent-region)
+        )
 
   (make-local-variable 'indent-region-function)
   (setq indent-region-function 'specman-indent-region)
@@ -3247,16 +3039,9 @@ Key Bindings:
         (setq comment-indent-function 'specman-comment-indent))
     (make-local-variable 'comment-indent-function)
     (setq comment-indent-function 'specman-comment-indent))
-  
-  ;; Make a menu bar
-  (if (string-match "XEmacs" emacs-version)
-      (progn
-        (if (and current-menubar
-                 (not (assoc "Specman" current-menubar)))
-            (progn
-              (set-buffer-menubar (copy-sequence current-menubar))
-              (add-submenu nil specman-xemacs-menu))) ))
-  
+
+  (easy-menu-add specman-menu) ;; required for XEmacs, nop on Emacs
+ 
   ;; imenu setup - setup the function that creates the specman index
   (when specman-index-menu-active
     (setq imenu--split-submenus-enable nil)
@@ -3420,7 +3205,7 @@ Key Bindings:
           (save-excursion
             ;; have to be careful here to prevent finding the end of the current
             ;; statement/action but still not entering any new scope while checking that.
-            (specman-re-search-backward "[;)}]" (specman-beg-of-line-pos) t within-code-region)
+            (specman-re-search-backward "[;)}]" (line-beginning-position) t within-code-region)
             
             (unless (looking-at ";")
               (forward-char))
@@ -3534,7 +3319,7 @@ indentation change."
            )
 
       (unless (zerop shift-amt)
-        (delete-region (specman-beg-of-line-pos)
+        (delete-region (line-beginning-position)
                        (specman-indent-pos))
         (beginning-of-line)
         (indent-to indent))
@@ -3589,7 +3374,7 @@ indentation change."
       (cond
 
        (;; Open scope or list
-        (safe-char= (char-after) ?\{)
+        (specman-safe-char= (char-after) ?\{)
 
         (let* ((beg-after-last-termination
                 (save-excursion
@@ -3614,15 +3399,15 @@ indentation change."
                 (goto-char parenloc)
                 (if (save-excursion                        ;; special case:
                       (and (specman-up-list t)             ;; scope within a parens is a
-                           (safe-char= (char-after) ?\())) ;; list argument to a function
+                           (specman-safe-char= (char-after) ?\())) ;; list argument to a function
                     (back-to-indentation)                  ;; so indent according to last line
                   (goto-char (specman-beg-of-statement t)))  ;; normally indent to statement
-                (if (safe-char= c ?\})
+                (if (specman-safe-char= c ?\})
                     (current-column)
                   (+ (current-column) 
                      specman-basic-offset
                      continuing-line-offset)))
-            (if (safe-char= c ?\})            ;; leave at same column as non-comment char
+            (if (specman-safe-char= c ?\})            ;; leave at same column as non-comment char
                 (progn
                   (goto-char parenloc)
                   (current-column))
@@ -3631,7 +3416,7 @@ indentation change."
         )
 
        (;; Inside ( )
-        (safe-char= (char-after) ?\()
+        (specman-safe-char= (char-after) ?\()
 
         (let* ((beg-after-last-termination
                 (save-excursion
@@ -3676,7 +3461,7 @@ indentation change."
                   specman-continued-line-offset))        ;; indent as non-terminated
                )
 
-          (+ (if (safe-char= c ?\))           ;; add offset for non-terminated lines
+          (+ (if (specman-safe-char= c ?\))           ;; add offset for non-terminated lines
                  0                            ;; which are not the closing parens 
                continuing-line-offset)
              (progn
@@ -3688,14 +3473,14 @@ indentation change."
                      (back-to-indentation)
                      (+ (current-column)
                         specman-basic-offset))
-                 (if (safe-char= c ?\))       ;; leave at same column as non-comment char
+                 (if (specman-safe-char= c ?\))       ;; leave at same column as non-comment char
                      (progn
                        (goto-char parenloc)
                        (current-column))
                    (current-column)))))))
 
        (;; Inside [ ]
-        (safe-char= (char-after) ?\[)
+        (specman-safe-char= (char-after) ?\[)
         (progn
           (forward-char 1)
           (skip-chars-forward " \t")     ;; move position to end of whitespace
@@ -3703,12 +3488,12 @@ indentation change."
                   (eolp))                ;; or end-of-line
               (progn                     ;; indent normally
                 (goto-char (specman-beg-of-statement t))
-                (if (safe-char= c ?\])
+                (if (specman-safe-char= c ?\])
                     (current-column)
                   (progn
                     (+ (current-column) 
                        specman-basic-offset))))
-            (if (safe-char= c ?\])       ;; leave at same column as non-comment char
+            (if (specman-safe-char= c ?\])       ;; leave at same column as non-comment char
                 (progn
                   (goto-char parenloc)
                   (current-column))
@@ -3856,7 +3641,7 @@ indentation change."
           )
       (when comment-start
         (goto-char comment-start)
-        (delete-region comment-start (specman-end-of-line-pos))
+        (delete-region comment-start (line-end-position))
         (delete-horizontal-space)
         t))))
 
@@ -3871,7 +3656,7 @@ indentation change."
     (when (and (or skip-scope-closer-check
                    (progn
                      (beginning-of-line)
-                     (specman-re-search-forward "};" (specman-end-of-line-pos) t)))
+                     (specman-re-search-forward "};" (line-end-position) t)))
                (or kill-existing-comment
                    (save-excursion
                      (end-of-line)
@@ -3963,7 +3748,7 @@ indentation change."
             (specman-kill-line-comment))
                                         ;(message "str = \"%s\"" str)
           (insert (concat
-                   " -- "
+                   " " specman-default-line-comment-starter " "
                    (if (> (length str)
                           30)
                        (concat (substring str 0 30 )
@@ -3979,7 +3764,7 @@ indentation change."
   (let ((last-char (char-before)))
     (insert ";") ; Don't use last-command-char, cause this function may be called from another function
     (when (and specman-auto-endcomments
-               (safe-char= last-char ?\} )
+               (specman-safe-char= last-char ?\} )
                (not (specman-within-string-p))
                (not (specman-within-comment-p)))
       
@@ -4137,26 +3922,37 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (specman-indent-line-keep-pos)
   )
 
+(defmacro specman--maybe-delete-selection ()
+  (if (featurep 'xemacs)
+      '(when (and (region-exists-p) pending-delete-mode)
+         (delete-region (region-beginning) (region-end)))
+    '(when delete-selection-mode
+       (delete-active-region))))
+
 (defun specman-yank ()
   "Yank (paste) and indent"
   (interactive)
-  ;; Need this because of bug in emacs: when another function calls
-  ;; yank-clipboard-selection it does not overwrite selected text, but when it
-  ;; is invoked by a key command it does.
-  (if (selection-owner-p)
-      (delete-primary-selection))
-
-  (setq start (line-number))
-  (yank-clipboard-selection)
-  (setq end (line-number))
+  (specman--maybe-delete-selection)
+  (yank)
   (save-excursion
-    (goto-line start)
-    (while (<= (line-number) end)
-      (specman-activate-indent)
-      (forward-line 1))
-    )
-  )
+    (indent-region (mark) (point))))
 
+(defun specman-insert-and-indent-to (str col &optional prefix)
+  "Insert string STR at point and indent each inserted line to COL."
+  (let ((beg (point)))
+    (insert
+     (if prefix
+         (replace-regexp-in-string "^" specman-default-line-comment-starter str)
+       str)
+    (let ((end (point-marker)))
+      ;; Note that END position will change during loop execution as
+      ;; lines are indented. Hence a marker, not just point.
+      (goto-char beg)
+      (beginning-of-line)
+      (while (< (point) end)
+        (indent-to col)
+        (forward-line))
+      (goto-char end)))))
 
 ;; -----------------------------------------------------------------------------
 ;;  Scope Queries
@@ -4224,6 +4020,16 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
                                         ;--============================================================================--
 
 ;; -----------------------------------------------------------------------------
+(defun specman-comment-line ()
+  "Insert line comment before the current line and reindent it."
+  (interactive)
+
+  (indent-according-to-mode)
+  (back-to-indentation)
+  (insert (concat specman-default-line-comment-starter
+                  "  ")))
+
+;; -----------------------------------------------------------------------------
 (defun specman-comment-line-w-minus ()
   "Insert a -- comment before the current line and reindent it."
   (interactive)
@@ -4231,6 +4037,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (indent-according-to-mode)
   (back-to-indentation)
   (insert "--  "))
+(make-obsolete 'specman-comment-line-w-minus 'specman-comment-line "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-comment-line-w-slash ()
@@ -4240,6 +4047,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (indent-according-to-mode)
   (back-to-indentation)
   (insert "//  "))
+(make-obsolete 'specman-comment-line-w-slash 'specman-comment-line "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-exclude-code-region (beg end)
@@ -4271,8 +4079,8 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
     (while (< (point)
               end-marker)
       (when (specman-line-within-comment-p)
-        (comment-region (specman-beg-of-line-pos)
-                        (specman-end-of-line-pos)
+        (comment-region (line-beginning-position)
+                        (line-end-position)
                         -2))
       (specman-indent-line)
       (forward-line 1))
@@ -4302,7 +4110,7 @@ never less than 2 characters."
 
 ;; -----------------------------------------------------------------------------
 (defun specman-major-comment-separator ()
-  "Insert a comment line of '=', prefixed and suffixed by '--',
+  "Insert a comment line of '=', prefixed and suffixed by `specman-default-line-comment-starter',
 never less than 4 characters."
   (interactive)
 
@@ -4314,11 +4122,11 @@ never less than 4 characters."
     (when (<= cur-col
               (- specman-max-line-length 4))
       (progn
-        (insert "--")
+        (insert specman-default-line-comment-starter)
         (while (> counter 0)
           (insert "=")
           (setq counter (- counter 1)))
-        (insert "--")))
+        (insert specman-default-line-comment-starter)))
     (newline)
     (indent-to-left-margin)
     (indent-to cur-col)))
@@ -4450,14 +4258,9 @@ the struct/define name only, otherwise a full header with comments."
             (if compact-header
                 (progn
                   (indent-to-left-margin)
-                  (insert "\
---  <struct>
-")
-
-                  (forward-line -2)
-                  (for i from 1 to 2 do (progn
-                                          (forward-line)
-                                          (indent-to header-indent)))
+                  (specman-insert-and-indent-to "\
+  <struct>
+" header-indent specman-default-line-comment-starter)
                   (specman-major-comment-separator)
                   (goto-char start)
                   (search-forward "<struct>")
@@ -4465,15 +4268,11 @@ the struct/define name only, otherwise a full header with comments."
                   (end-of-line))
               (progn
                 (indent-to-left-margin)
-                (insert "\
---  Struct      :  <struct>
---  Description :  <description>
---  Note        :  <note>
-")
-                (forward-line -4)
-                (for i from 1 to 4 do (progn
-                                        (forward-line)
-                                        (indent-to header-indent)))
+                (specman-insert-and-indent-to "\
+  Struct      :  <struct>
+  Description :  <description>
+  Note        :  <note>
+" header-indent specman-default-line-comment-starter)
                 (specman-major-comment-separator)
                 (goto-char start)
                 (search-forward "<struct>")
@@ -4491,7 +4290,8 @@ the struct/define name only, otherwise a full header with comments."
                   (search-forward "<note>")
                   (specman-comment-start-entry "Note"
                                                "<Note> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4504,7 +4304,8 @@ the struct/define name only, otherwise a full header with comments."
                   (search-forward "<description>")
                   (specman-comment-start-entry "Description"
                                                "<Description> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4595,13 +4396,9 @@ method name only, otherwise a full header with comments."
             (if compact-header
                 (progn
                   (indent-to-left-margin)
-                  (insert "\
---  <method>
-")
-                  (forward-line -2)
-                  (for i from 1 to 2 do (progn
-                                          (forward-line)
-                                          (indent-to header-indent)))
+                  (specman-insert-and-indent-to "\
+  <method>
+" header-indent specman-default-line-comment-starter)
                   (specman-minor-comment-separator)
                   (goto-char start)
                   (search-forward "<method>")
@@ -4609,17 +4406,13 @@ method name only, otherwise a full header with comments."
                   (end-of-line))
               (progn
                 (indent-to-left-margin)
-                (insert "\
---  Method      :  <method>
---  Description :  <description>
---  Parameters  :  <parameters>
---  Return Val  :  <return val>
---  Note        :  <note>
-")
-                (forward-line -6)
-                (for i from 1 to 6 do (progn
-                                        (forward-line)
-                                        (indent-to header-indent)))
+                (specman-insert-and-indent-to "\
+  Method      :  <method>
+  Description :  <description>
+  Parameters  :  <parameters>
+  Return Val  :  <return val>
+  Note        :  <note>
+" header-indent specman-default-line-comment-starter)
                 (specman-minor-comment-separator)
                 (goto-char start)
                 (search-forward "<method>")
@@ -4637,7 +4430,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<note>")
                   (specman-comment-start-entry "Note"
                                                "<Note> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4650,7 +4444,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<return val>")
                   (specman-comment-start-entry "Return-Val"
                                                "<Return Val> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4663,7 +4458,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<parameters>")
                   (specman-comment-start-entry "Parameters"
                                                "<Parameters> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4676,7 +4472,8 @@ method name only, otherwise a full header with comments."
                   (search-forward "<description>")
                   (specman-comment-start-entry "Description"
                                                "<Description> "
-                                               "--              :  "
+                                               (concat specman-default-line-comment-starter
+                                                       "              :  ")
                                                indent
                                                (set-marker (make-marker) (match-beginning 0))
                                                t
@@ -4756,22 +4553,22 @@ method name only, otherwise a full header with comments."
              (looking-at ".*[^ \t]+")
              
              (newline)
-             (previous-line 1)
+             (forward-line -1)
              )
             )
       
       (newline)
-      (previous-line 1)))
+      (forward-line -1)))
 
                                         ;  (insert "<'") (indent-according-to-mode)
                                         ;  (end-of-line) (newline)
                                         ;  (insert "'>") (indent-according-to-mode)
-                                        ;  (previous-line 1) (end-of-line)
+                                        ;  (forward-line -1) (end-of-line)
                                         ;  (specman-insert-newline)
 
   (insert "<'") (newline 4)
   (insert "'>")
-  (previous-line 2)
+  (forward-line -2)
   )
 
 ;; -----------------------------------------------------------------------------
@@ -4789,7 +4586,7 @@ method name only, otherwise a full header with comments."
   (end-of-line) (newline)
   (insert "};") 
   (indent-according-to-mode)
-  (previous-line 1) (end-of-line)
+  (forward-line -1) (end-of-line)
   (specman-insert-newline))
 
 ;; -----------------------------------------------------------------------------
@@ -4806,7 +4603,7 @@ method name only, otherwise a full header with comments."
   (insert "{") (indent-according-to-mode)
   (end-of-line) (newline)
   (insert "};") (indent-according-to-mode)
-  (previous-line 1) (end-of-line)
+  (forward-line -1) (end-of-line)
   (specman-insert-newline))
 
 
@@ -4819,7 +4616,7 @@ as much as possible.  comment style is preserved."
 
   (if (save-excursion
         (beginning-of-line)
-        (not (re-search-forward "[^ \t]" (specman-end-of-line-pos) t)))
+        (not (re-search-forward "[^ \t]" (line-end-position) t)))
 
       ;; warn if empty line
       (message "realign-comment doesn't work on empty lines.")
@@ -4829,10 +4626,10 @@ as much as possible.  comment style is preserved."
             (progn
               (beginning-of-line)
               (or (re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)[^ \t]"
-                                     (specman-end-of-line-pos)
+                                     (line-end-position)
                                      t)
                   (re-search-forward "\\(\\)[^ \t]" ;; the empty match is for buffer-substring
-                                     (specman-end-of-line-pos)
+                                     (line-end-position)
                                      t))
               (buffer-substring (match-beginning 1) (match-end 1)))
             )
@@ -4864,21 +4661,29 @@ as much as possible.  comment style is preserved."
           (progn
             (kill-line)
             (newline)
-            (previous-line 1)
+            (forward-line -1)
             (end-of-line)))
       )))
 
 ;; -----------------------------------------------------------------------------
-(defun specman-insert-comment (prefix)
+(defun specman-insert-comment (&optional prefix)
   "Insert a comment in the current location.  A comment buffer is opened for
    text editing with auto-fill mode (line length being handled automatically).
    The comment style is preserved if already entered."
 
   (specman-comment-start-entry "Entry"
                                "<Comment Entry> "
-                               prefix
+                               (or prefix (concat specman-default-line-comment-starter
+                                                  "  "))
                                (current-column)
                                (set-marker (make-marker) (point))))
+
+(defun specman-insert-line-comment ()
+  "Start entry of a line comment, or if currently inside a comment - edit it."
+  (interactive)
+  (if (specman-within-comment-p)
+      (specman-reedit-comment)
+    (specman-insert-comment)))
 
 (defun specman-insert-minus-comment ()
   "Start entry of a -- comment, or if currently inside a comment - edit it."
@@ -4886,6 +4691,7 @@ as much as possible.  comment style is preserved."
   (if (specman-within-comment-p)
       (specman-reedit-comment)
     (specman-insert-comment "--  ")))
+(make-obsolete 'specman-insert-minus-comment 'specman-insert-line-comment "1.25")
 
 (defun specman-insert-slash-comment ()
   "Start entry of a // comment, or if currently inside a comment - edit it."
@@ -4893,6 +4699,7 @@ as much as possible.  comment style is preserved."
   (if (specman-within-comment-p)
       (specman-reedit-comment)
     (specman-insert-comment "//  ")))
+(make-obsolete 'specman-insert-slash-comment 'specman-insert-line-comment "1.25")
 
 ;; -----------------------------------------------------------------------------
 (defun specman-internal-is-matching-comment-line (comment-column comment-prefix)
@@ -4910,7 +4717,7 @@ style.  returns:
         (forward-char (- comment-column
                          (current-column)))
         (and (looking-at comment-prefix)
-             (if (re-search-backward "[^ \t]" (specman-beg-of-line-pos) t)
+             (if (re-search-backward "[^ \t]" (line-beginning-position) t)
                  'first
                'clean))))))
 
@@ -4948,7 +4755,7 @@ style.  returns:
        (beginning-of-line)
        ;;(re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)[^ \t]"
        (re-search-forward "\\(\/\/+[ \t]*\\|\-\-+[ \t]*\\)"
-                          (specman-end-of-line-pos)
+                          (line-end-position)
                           nil)
        (setq comment-prefix (buffer-substring (match-beginning 1)
                                               (match-end 1)))
@@ -4961,12 +4768,12 @@ style.  returns:
                                                          comment-prefix)
          (forward-line -1))
        (forward-line)
-       (re-search-forward comment-prefix (specman-end-of-line-pos) nil)
+       (re-search-forward comment-prefix (line-end-position) nil)
        (goto-char (match-beginning 0))
        
        (set-marker beg-marker (point))
        (setq comment-text (buffer-substring (match-end 0)
-                                            (specman-end-of-line-pos)))
+                                            (line-end-position)))
        (end-of-line)
        (set-marker end-marker (point))
        
@@ -4975,13 +4782,13 @@ style.  returns:
            (equal (specman-internal-is-matching-comment-line comment-column
                                                              comment-prefix)
                   'clean)
-         (re-search-forward comment-prefix (specman-end-of-line-pos) nil)
+         (re-search-forward comment-prefix (line-end-position) nil)
          (setq comment-text
                (concat comment-text
                        "\n"
                        (buffer-substring (match-end 0)
-                                         (specman-end-of-line-pos))))
-         (set-marker end-marker (specman-end-of-line-pos))
+                                         (line-end-position))))
+         (set-marker end-marker (line-end-position))
          (forward-line))
        )
      )
@@ -5008,7 +4815,7 @@ style.  returns:
   "Insert a standard Specman file header."
   (interactive)
   (let ((start (point)))
-    (insert "\
+    (insert (replace-regexp-in-string "^//" specman-default-line-comment-starter "\
 //-----------------------------------------------------------------------------
 // Title         : <title>
 // Project       : <project>
@@ -5029,7 +4836,7 @@ style.  returns:
 // <modhist>
 //-----------------------------------------------------------------------------
 
-")
+"))
     (goto-char start)
     (search-forward "<filename>")
     (replace-match (buffer-name) t t)
@@ -5097,12 +4904,9 @@ style.  returns:
   (delete-char 1))
 
 
-                                        ;--============================================================================--
+;;============================================================================--
 ;; Bug reporting
-                                        ;--============================================================================--
-
-(require 'reporter)
-
+;;============================================================================--
 (defun specman-submit-bug-report ()
   "Submit via mail a bug report on specman-mode.el"
   (interactive)
@@ -5178,8 +4982,6 @@ the value of specman-comment-mode-hook.
 
 Global user options:
 "
-  (interactive)
-
   ;; Major modes are supposed to just (kill-all-local-variables)
   ;; but we rely on specman-comment-parent-buffer already having been set
   ;;
@@ -5370,20 +5172,61 @@ the user to edit."
 ;; editing multi-line comments. The package can be installed from
 ;; ELPA (Emacs) or as part of the `text-modes' package (XEmacs).
 
+(eval-when-compile
+  ;; Silence byte-compiler warnings
+  (defvar filladapt-token-table)
+  (defvar filladapt-token-match-table)
+  (defvar filladapt-token-conversion-table))
+
 (eval-after-load "filladapt"
   ; The e comment token in the token table must appear before the bullet token
   ; since the bullet regexp include "-+". That's why we put it in the begining of
   ; the list. The order in the other lists is not important.
   ; C++ style comments are already recognized.
   '(progn
-     (setcar filladapt-token-table '("---*" e-comment))
+     (setcar filladapt-token-table '("\\(--\\|//\\)-*" e-comment))
      (setcar filladapt-token-match-table '(e-comment e-comment))
      (setcar filladapt-token-conversion-table '(e-comment . exact)))
-)
+  )
 
+(defun specman--module-at-point ()
+  "Returns module path at point as string.
+
+Check whether POINT is inside an import statement and return the
+corresponding module path (with environment variables
+substituted). The resulting path will not be converted into an
+absolute path."
+  (when (save-excursion
+          (goto-char (specman-beg-of-statement))
+          (looking-at "import\\s-"))
+    (save-excursion
+      (let ((beg (goto-char (1+ (re-search-backward "[\n\t\r ,(]"))))
+            (end (1- (re-search-forward "[\n\t\r ,;)]"))))
+        ;; There is still the open issue regarding treatment of '.',
+        ;; '..', and '//'. However, this is unlikely going to be a
+        ;; problem in Real Life(TM), i.e. production code.
+        ;;
+        ;; Do *not* substitute undefined environment variables, but
+        ;; instead make it obvious that something's improperly
+        ;; configured.
+        (substitute-env-vars (buffer-substring beg end) t)))))
+
+;; GNU Global (ggtags from MELPA)
+(eval-after-load "ggtags"
+  '(add-hook 'specman-mode-hook
+             (lambda () (setq-local ggtags-include-pattern
+                                    #'specman--module-at-point)))
+  )
 
 ;;; specman-comment mode definition ends here
 ;; -----------------------------------------------------------------------------
+
+
+;; -----------------------------------------------------------------------------
+;; The section below has not been reviewed recently and parts of it
+;; may be outdated. The section is left for reference.
+;;
+;; VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
 
 
 ;; -----------------------------------------------------------------------------
