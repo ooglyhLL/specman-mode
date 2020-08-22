@@ -3026,10 +3026,14 @@ Key Bindings:
   (setq indent-region-function 'specman-indent-region)
   (setq case-fold-search t)
 
-  (setq ecom-syntax-highlight
-        (string-match "\\.ecom\\'"
+  (when (string-match "\\.ecom\\'"
 		      (or (buffer-file-name)
-			  (buffer-name))))
+			  (buffer-name)))
+    (setq ecom-syntax-highlight t)
+    ;; ecom scripts don't support C-style block comments
+    (set-syntax-table (copy-syntax-table specman-mode-syntax-table))
+    (modify-syntax-entry ?/  ".")
+    (modify-syntax-entry ?*  "."))
 
   ;; setup the comment indent variable in a Emacs version portable way
   ;; ignore any byte compiler warnings you might get here
