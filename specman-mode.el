@@ -643,6 +643,11 @@ format (e.g. 09/17/1997) is not supported."
 ;; `syntax-ppss', they are defined as comment-style "a", "b" and
 ;; generic comment, respectively.
 
+(defvar ecom-syntax-highlight nil
+  "True if the current buffer is an .ecom file and should be syntax
+ highlighted as such (i.e. ignore ex-code-regions).")
+(make-variable-buffer-local 'ecom-syntax-highlight)
+
 (defalias 'specman-syntax-propertize-function
   ;; This lambda has been obtained by first trying to get this sorted
   ;; using `syntax-propertize-rules', then fine-tuning the result.
@@ -683,16 +688,17 @@ format (e.g. 09/17/1997) is not supported."
                                  (match-end 1)
                                  'syntax-table
                                  '(11))
-            (if (match-beginning 2)
-                (put-text-property (match-beginning 2)
-                                   (match-end 2)
-                                   'syntax-table
-                                   '(14)))
-            (if (match-beginning 3)
-                (put-text-property (match-beginning 3)
-                                   (match-end 3)
-                                   'syntax-table
-                                   '(14))))
+            (when (not ecom-syntax-highlight)
+              (if (match-beginning 2)
+                  (put-text-property (match-beginning 2)
+                                     (match-end 2)
+                                     'syntax-table
+                                     '(14)))
+              (if (match-beginning 3)
+                  (put-text-property (match-beginning 3)
+                                     (match-end 3)
+                                     'syntax-table
+                                     '(14)))))
           )))))
 
 ;; =================================================
@@ -2008,11 +2014,6 @@ buffer and return point."
 
   (or (specman-within-ex-code-point)
       (specman-line-within-star-comment-p)))
-
-(defvar ecom-syntax-highlight nil
-  "True if the current buffer is an .ecom file and should be syntax
- highlighted as such (i.e. ignore ex-code-regions).")
-(make-variable-buffer-local 'ecom-syntax-highlight)
 
 (defun specman-search-forward-long-line (limit)
   (when (< specman-max-line-length
