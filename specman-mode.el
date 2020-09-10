@@ -1029,6 +1029,7 @@ have an updating cost and the index itself to nil."
   (modify-syntax-entry ?\] ")["       table)
   (modify-syntax-entry ?\% "."        table)
   (modify-syntax-entry ?\@ "."        table)  ;; for events
+  (modify-syntax-entry ?\- "."        table)
   (modify-syntax-entry ?\' "."        table)
   (modify-syntax-entry ?\< "."        table)
   (modify-syntax-entry ?\> "."        table)
