@@ -2298,8 +2298,8 @@ See also `specman-font-lock-extra-types'.")
          "\\(cvl[ \t\n]+\\(?:method\\|call\\(?:back\\)?\\)\\(?:[ \t\n]+async\\)\\)"
          
          ;; port declaration
-         "\\(\\(?:\\(?:in\\|out\\|intout\\)[ \t\n]+\\)?simple_port[ \t\n]+of\\)"
-         "\\(\\(?:in\\|out\\|intout\\)[ \t\n]+\\(?:buffer\\|call\\|event\\|method\\)_port[ \t\n]+of\\)"
+         "\\(\\(?:\\(?:in\\|out\\|inout\\)[ \t\n]+\\)?simple_port[ \t\n]+of\\)"
+         "\\(\\(?:in\\|out\\|inout\\)[ \t\n]+\\(?:buffer\\|call\\|event\\|method\\)_port[ \t\n]+of\\)"
 
          "\\)"
          specman-symbol-end-regexp
