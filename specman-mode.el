@@ -1239,6 +1239,7 @@ have an updating cost and the index itself to nil."
                          "()")
                         (copy-marker (match-beginning 3)))
                   index-alist)
+            (specman-scope-index-down-scope scope-index t)
             )
            (;;  on event method
             (match-beginning 4)
