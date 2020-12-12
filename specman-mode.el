@@ -286,8 +286,8 @@ format (e.g. 09/17/1997) is not supported."
 
 
 (defconst specman-field-definition-regexp
-  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\(?:\\*?[A-Za-z0-9_]+\\|\\[[^\\[]*\\]\\)"
-  "Regexp that identifies field definitions (arg 1)")
+  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\(?:[~%!]+[ \t\n]*\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\(?:\\*?[A-Za-z0-9_]+\\|\\[[^\\[]*\\]\\)"
+  "Regexp that identifies field definitions (arg 2) and qualifier (arg1)")
 
 (defconst specman-variable-definition-regexp
   "var[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:=?[ \t\n]*[{*+-]?[ \t\n]*\\([A-Za-z0-9_]+\\)"
@@ -298,7 +298,7 @@ format (e.g. 09/17/1997) is not supported."
   "Regexp that identifies event definitions (arg 1)")
 
 (defconst specman-type-definition-regexp
-  "\\(?:package[ \t\n]*\\)?\\(?:method_\\)?type[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\["
+  "\\(?:\\(?:package[ \t\n]*\\)?\\(?:method_\\)?type\\|extend\\)[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\["
   "Regexp that identifies type definitions (arg 1)")
 
 (defconst specman-cover-definition-regexp
@@ -587,6 +587,7 @@ format (e.g. 09/17/1997) is not supported."
   (modify-syntax-entry ?\] ")["       table)
   (modify-syntax-entry ?\% "."        table)
   (modify-syntax-entry ?\@ "."        table)  ;; for events
+  (modify-syntax-entry ?\- "."        table)
   (modify-syntax-entry ?\' "."        table)
   (modify-syntax-entry ?\< "."        table)
   (modify-syntax-entry ?\> "."        table)
@@ -786,6 +787,8 @@ format (e.g. 09/17/1997) is not supported."
             "\\(?:"
             
             "\\(?:"
+            type-regexp
+            "\\)\\|\\(?:"
             scope-regexp
             "\\)\\|\\(?:"
             method-regexp
@@ -793,8 +796,6 @@ format (e.g. 09/17/1997) is not supported."
             on-event-regexp
             "\\)\\|\\(?:"
             event-regexp
-            "\\)\\|\\(?:"
-            type-regexp
             "\\)\\|\\(?:"
             cover-regexp
             "\\)\\|\\(?:"
@@ -818,8 +819,16 @@ format (e.g. 09/17/1997) is not supported."
                                           t
                                           t)
           (cond
-           (;;  container
+           (;;  type
             (match-beginning 1)
+
+            (push (cons (specman-prepared-buffer-substring (match-beginning 1)
+                                                           (match-end 1))
+                        (copy-marker (match-beginning 1)))
+                  type-alist)
+            )
+           (;;  container
+            (match-beginning 2)
             
             (progn
               (save-match-data
@@ -827,10 +836,10 @@ format (e.g. 09/17/1997) is not supported."
                                            (point-max)
                                            t
                                            t))
-              (push (cons (specman-prepared-buffer-substring (match-beginning 1)
-                                                             (match-end 1))
+              (push (cons (specman-prepared-buffer-substring (match-beginning 2)
+                                                             (match-end 2))
                           (cons (cons "==  DEFINITION  =="
-                                      (copy-marker (match-beginning 1)))
+                                      (copy-marker (match-beginning 2)))
                                 (specman-imenu-create-menu-for-region
                                  (point)
                                  (save-excursion
@@ -841,38 +850,31 @@ format (e.g. 09/17/1997) is not supported."
               )
             )
            (;;  method
-            (match-beginning 2)
+            (match-beginning 3)
             
             (push (cons (concat
-                         (specman-prepared-buffer-substring (match-beginning 2)
-                                                            (match-end 2))
+                         (specman-prepared-buffer-substring (match-beginning 3)
+                                                            (match-end 3))
                          "()")
-                        (copy-marker (match-beginning 2)))
-                  index-alist)
-            )
-           (;;  on event method
-            (match-beginning 3)
-
-            (push (cons (specman-prepared-buffer-substring (match-beginning 3)
-                                                           (match-end 3))
                         (copy-marker (match-beginning 3)))
                   index-alist)
+            (specman-down-scope)
             )
-           (;;  event
+           (;;  on event method
             (match-beginning 4)
 
             (push (cons (specman-prepared-buffer-substring (match-beginning 4)
                                                            (match-end 4))
                         (copy-marker (match-beginning 4)))
-                  event-alist)
+                  index-alist)
             )
-           (;;  type
+           (;;  event
             (match-beginning 5)
 
             (push (cons (specman-prepared-buffer-substring (match-beginning 5)
                                                            (match-end 5))
                         (copy-marker (match-beginning 5)))
-                  type-alist)
+                  event-alist)
             )
            (;;  cover group
             (match-beginning 6)
@@ -1805,8 +1807,8 @@ See also `specman-font-lock-extra-types'.")
          "\\(cvl[ \t\n]+\\(?:method\\|call\\(?:back\\)?\\)\\(?:[ \t\n]+async\\)\\)"
          
          ;; port declaration
-         "\\(\\(?:\\(?:in\\|out\\|intout\\)[ \t\n]+\\)?simple_port[ \t\n]+of\\)"
-         "\\(\\(?:in\\|out\\|intout\\)[ \t\n]+\\(?:buffer\\|call\\|event\\|method\\)_port[ \t\n]+of\\)"
+         "\\(\\(?:\\(?:in\\|out\\|inout\\)[ \t\n]+\\)?simple_port[ \t\n]+of\\)"
+         "\\(\\(?:in\\|out\\|inout\\)[ \t\n]+\\(?:buffer\\|call\\|event\\|method\\)_port[ \t\n]+of\\)"
 
          "\\)"
          specman-symbol-end-regexp
