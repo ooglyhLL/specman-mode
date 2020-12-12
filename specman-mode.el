@@ -59,9 +59,6 @@
              (lambda ()
                (speedbar-add-supported-extension ".e"))))
 
-(eval-when-compile
-  (require 'cl))
-
 (require 'imenu)
 (require 'reporter)
 (require 'easymenu)
