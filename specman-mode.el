@@ -298,7 +298,7 @@ format (e.g. 09/17/1997) is not supported."
   "Regexp that identifies event definitions (arg 1)")
 
 (defconst specman-type-definition-regexp
-  "\\(?:package[ \t\n]*\\)?\\(?:method_\\)?type[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\["
+  "\\(?:\\(?:package[ \t\n]*\\)?\\(?:method_\\)?type\\|extend\\)[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\["
   "Regexp that identifies type definitions (arg 1)")
 
 (defconst specman-cover-definition-regexp
@@ -1163,6 +1163,8 @@ have an updating cost and the index itself to nil."
             "\\(?:"
             
             "\\(?:"
+            type-regexp
+            "\\)\\|\\(?:"
             scope-regexp
             "\\)\\|\\(?:"
             method-regexp
@@ -1170,8 +1172,6 @@ have an updating cost and the index itself to nil."
             on-event-regexp
             "\\)\\|\\(?:"
             event-regexp
-            "\\)\\|\\(?:"
-            type-regexp
             "\\)\\|\\(?:"
             cover-regexp
             "\\)\\|\\(?:"
@@ -1199,8 +1199,16 @@ have an updating cost and the index itself to nil."
                                           t
                                           t)
           (cond
-           (;;  container
+           (;;  type
             (match-beginning 1)
+
+            (push (cons (specman-prepared-buffer-substring (match-beginning 1)
+                                                           (match-end 1))
+                        (copy-marker (match-beginning 1)))
+                  type-alist)
+            )
+           (;;  container
+            (match-beginning 2)
             
             (progn
               (save-match-data
@@ -1208,10 +1216,10 @@ have an updating cost and the index itself to nil."
                                            (point-max)
                                            t
                                            t))
-              (push (cons (specman-prepared-buffer-substring (match-beginning 1)
-                                                             (match-end 1))
+              (push (cons (specman-prepared-buffer-substring (match-beginning 2)
+                                                             (match-end 2))
                           (cons (cons "==  DEFINITION  =="
-                                      (copy-marker (match-beginning 1)))
+                                      (copy-marker (match-beginning 2)))
                                 (specman-imenu-create-menu-for-region
                                  (point)
                                  (save-excursion
@@ -1223,38 +1231,30 @@ have an updating cost and the index itself to nil."
               )
             )
            (;;  method
-            (match-beginning 2)
+            (match-beginning 3)
             
             (push (cons (concat
-                         (specman-prepared-buffer-substring (match-beginning 2)
-                                                            (match-end 2))
+                         (specman-prepared-buffer-substring (match-beginning 3)
+                                                            (match-end 3))
                          "()")
-                        (copy-marker (match-beginning 2)))
-                  index-alist)
-            )
-           (;;  on event method
-            (match-beginning 3)
-
-            (push (cons (specman-prepared-buffer-substring (match-beginning 3)
-                                                           (match-end 3))
                         (copy-marker (match-beginning 3)))
                   index-alist)
             )
-           (;;  event
+           (;;  on event method
             (match-beginning 4)
 
             (push (cons (specman-prepared-buffer-substring (match-beginning 4)
                                                            (match-end 4))
                         (copy-marker (match-beginning 4)))
-                  event-alist)
+                  index-alist)
             )
-           (;;  type
+           (;;  event
             (match-beginning 5)
 
             (push (cons (specman-prepared-buffer-substring (match-beginning 5)
                                                            (match-end 5))
                         (copy-marker (match-beginning 5)))
-                  type-alist)
+                  event-alist)
             )
            (;;  cover group
             (match-beginning 6)
