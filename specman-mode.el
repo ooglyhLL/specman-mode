@@ -286,8 +286,8 @@ format (e.g. 09/17/1997) is not supported."
 
 
 (defconst specman-field-definition-regexp
-  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\(?:\\*?[A-Za-z0-9_]+\\|\\[[^\\[]*\\]\\)"
-  "Regexp that identifies field definitions (arg 1)")
+  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\(?:[~%!]+[ \t\n]*\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*:[ \t\n]*\\(?:\\*?[A-Za-z0-9_]+\\|\\[[^\\[]*\\]\\)"
+  "Regexp that identifies field definitions (arg 2) and qualifier (arg1)")
 
 (defconst specman-variable-definition-regexp
   "var[ \t\n]+\\([A-Za-z0-9_]+\\)[ \t\n]*:=?[ \t\n]*[{*+-]?[ \t\n]*\\([A-Za-z0-9_]+\\)"
