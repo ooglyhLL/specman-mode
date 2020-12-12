@@ -1998,7 +1998,7 @@ buffer and return point."
   (if (= (point) (point-min))
       (goto-char (point-max))
     (forward-sexp)
-    (backward-char)))
+    (goto-char (1- (point)))))
 
 (defun specman-within-ex-code-point ()
   "Return point if within ex-code region, else nil."
