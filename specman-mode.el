@@ -60,7 +60,7 @@
                (speedbar-add-supported-extension ".e"))))
 
 (eval-when-compile
-  (require 'cl))
+  (require 'cl-lib))
 
 (require 'imenu)
 (require 'reporter)
@@ -585,7 +585,7 @@ Initialized for performace intensive operations without user interaction
 (e.g. region indentation) and must be cleared afterwards.")
 (make-variable-buffer-local 'global-scope-index)
 
-(defstruct scope-descriptor paren match parent paren-parent)
+(cl-defstruct scope-descriptor paren match parent paren-parent)
 
 (defun specman-create-scope-index ()
   "Create a list of scope descriptors, each of which is a list of 3 members:
