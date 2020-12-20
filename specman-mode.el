@@ -1828,16 +1828,16 @@ See also `specman-font-lock-extra-types'.")
 
             ;; list - modify
             "add" "add0" "clear" "delete" "fast_delete" "insert" "pop" "pop0"
-            "push" "push0" "resize"
+            "push" "push0" "resize" "set"
 
             ;; list - general
             "apply" ;; "copy" - also for any_struct
             "count" "exists" ;; "field" - already exists
-            "first" "first_index" "get_indices" "has" "is_a_permutation" "is_empty"
+            "first" "first_index" "flatten" "get_indices" "has" "is_a_permutation" "is_empty"
             "last" "last_index"
             "max" "max_index" "max_value"
             "min" "min_index" "min_value"
-            "reverse" "size" "sort" "sort_by_field" "split" "top" "top0" "unique"
+            "reverse" "size" "sort" "sort_by_field" "split" "top" "top0" "unique" "all_unique"
 
             ;; list - sublist
             "all" "all_indices"
@@ -1852,6 +1852,16 @@ See also `specman-font-lock-extra-types'.")
             "key" "key_index" "key_exists"
 
             
+            ;; set pseudo methods
+            ;; ------------------
+            "union" "intersect" "diff"
+            "uint_size" "size_is_uint" ;; "size"
+            ;; "min" "max"
+            "int_min" "int_max" "min_is_int" "max_is_int"
+            "uint_min" "uint_max" "min_is_uint" "max_is_uint"
+            "get_all_ranges" "collect_all_ranges" "get_range" "get_range_below" "get_range_above"
+
+
             ;; string pseudo methods
             ;; ---------------------
 
@@ -1880,7 +1890,7 @@ See also `specman-font-lock-extra-types'.")
             ;; macro-related
             ;; -------------
             ;; "str_expand_dots" already in list
-            "get_current_line_num" "get_current_module" "reject_match"
+            "get_current_line_num" "get_current_module" "get_context_type" "reject_match"
             
             
             ;; Struct ID Routine
@@ -1952,26 +1962,38 @@ See also `specman-font-lock-extra-types'.")
 
             ;; low level file routines
             ;; -----------------------
-            "files.write_string_list" "files.add_file_type"
-            "files.close" "files.flush" "files.open"
-            "files.read" "files.read_lob"
-            "files.write" "files.write_lob"
-            
-            
+            "write_string_list" "add_file_type"
+            "close" "flush" "open" "writef"
+            ;; "read" "write"
+            "read_lob" "read_into_lob" "write_lob"
+
+            ;; file routines
+            ;; -------------
+            "add_file_type" "file_age" "file_append" "file_copy" "file_delete" "file_exists"
+            "file_extension" "file_is_dir" "file_is_link" "file_is_readable" "file_is_regular"
+            "file_is_temp" "file_is_text" "file_rename" "file_size" "flush_log_file"
+            "get_text_lines" "new_temp_file" "write_string_list" "write_compressed_string_list"
+
+
             ;; reading and writing structs
             ;; ---------------------------
-            "files.read_ascii_struct" "files.read_binary_struct"
-            "files.write_ascii_struct" "files.write_binary_struct"
+            "read_ascii_struct" "read_binary_struct"
+            "write_ascii_struct" "write_binary_struct"
 
 
             ;; Memory-Related Routines
             ;; -----------------------
             "do_otf_gc" "get_zombies"
 
+
+            ;; range generated fields
+            ;; ----------------------
+            "rgf_was_generated" "rgf_get_range" "rgf_was_reduced"
+
             
             ;; Constructs for Packing and Unpacking
             ;; ------------------------------------
-            "pack" "unpack" "swap" "do_pack" "do_unpack"
+            "pack" "unpack" "swap" "do_pack" "do_unpack" "pack_struct"
 
 
             ;; dut error routines
@@ -1999,10 +2021,17 @@ See also `specman-font-lock-extra-types'.")
             "setup_test" "generate_test" "start_test" "run_test" "extract_test"
             "check_test" "finalize_test"
 
-            
+            ;; Misc predefined methods
+            ;; -----------------------
+            "doing_stub" "get_timescale" "is_gui" "print_stack_trace"
+            "simulator_exists" "simulator_save"
+            "sn_plusarg_exists" "sn_plusarg_value"
+
+
             ;; predefined sys methods
             ;; ----------------------
-            "wave_setup" "setup"
+            "wave_setup" "setup" "pre_save" "pre_restore" "post_restore" "simulatore_save"
+            "remap_tick_access"
 
             
             ;; predefined any_struct methods
@@ -2010,12 +2039,24 @@ See also `specman-font-lock-extra-types'.")
             "init" "pre_generate" "post_generate" "check" "extract" "finalize"
             "quit" "run" "rerun" "copy" "do_print" "print_line"
 
-            
+
             ;; predefined unit-related any_struct methods
             ;; ------------------------------------------
             "get_unit" "get_enclosing_unit" "try_enclosing_unit" "set_unit"
 
-            
+
+            ;; Procedural API for Temporal Operators on event and expect struct Members
+            ;; ------------------------------------------------------------------------
+            "do_abort_on_event" "do_stop_on_event" "do_start_on_event" "do_abort_on_expect"
+            "do_stop_on_expect" "do_start_on_expect" "do_abort_on_struct" "do_stop_on_struct"
+            "do_start_on_struct" "apply_abort_on_struct" "apply_stop_on_struct"
+            "apply_start_on_struct" "do_abort_on_all_events" "do_stop_on_all_events"
+            "do_start_on_all_events" "do_abort_on_all_expects" "do_stop_on_all_expects"
+            "do_start_on_all_expects" "do_abort_on_subtree" "do_stop_on_subtree"
+            "do_start_on_subtree" "propagate_abort_on_subtree" "propagate_stop_on_subtree"
+            "propagate_start_on_subtree" "do_abort_on_all_instance_fields"
+            "do_stop_on_all_instance_fields" "do_start_on_all_instance_fields"
+
             ;; predefined any_unit methods
             ;; ---------------------------
             "hdl_path" "full_hdl_path" "e_path" "agent" "get_parent_unit" "hdl_expression"
@@ -2037,7 +2078,7 @@ See also `specman-font-lock-extra-types'.")
             ;; semaphore methods
             ;; -----------------
             "up" "down" "try_up" "try_down" "set_value" "get_value"
-            "set_max_value" "get_max_value" "lock" "release"
+            "set_max_value" "get_max_value" "lock" "free"
 
             
             ;; tcm related methods
@@ -2048,15 +2089,26 @@ See also `specman-font-lock-extra-types'.")
             
             ;; coverage methods
             ;; ----------------
-            "set_external_cover" "write_cover_file"
-
-            "covers.include_tests"
-            "covers.set_weight" "covers.set_at_least" "covers.set_cover"
-            "covers.get_contributing_runs" "covers.get_unique_buckets"
-            "covers.get_overall_grade" "covers.get_ecov_name"
-            "covers.get_test_name" "covers.get_seed"
+            "include_tests" "set_weight" "set_at_least" "set_cover" "set_cover_block"
+            "set_cover_check" "set_per_inst_for_struct" "get_contributing_runs"
+            "get_unique_buckets" "write_cover_file" "compute_overall_grade"
+            "get_overall_grade" "get_ucd_path" "get_test_name" "get_seed"
+            "set_unicov_hier" "set_cross_instance_collection" "get_top_size_items"
+            "pause_code_coverage" "resume_code_coverage" "is_code_coverage_paused"
 
             "range"
+
+
+            ;; simulator methods
+            ;; -----------------
+            "get_define" "is_stub_required" "get_stub_reason"
+
+
+            ;; time conversion methods
+            ;; -----------------------
+            "to_specman_scale" "from_specman_scale" "to_specman_scale_trunc"
+            "from_specman_scale_trunc" "to_real_specman_scale" "from_real_specman_scale"
+            "double_to_specman_scale" "double_from_specman_scale"
 
 
             ;; generation methods
@@ -2095,9 +2147,30 @@ See also `specman-font-lock-extra-types'.")
 
             ;; port methods
             ;; ------------
-            ;; TODO: add cvl stuff
             "bind"
-            
+
+            "put_mvl" "get_mvl" "put_mvl_list" "fill_mvl_list" "get_mvl_list"
+            "put_mvl_string" "get_mvl_string" "get_mvl4" "fill_mvl4_list"
+            "get_mvl4_list" "get_mvl4_string" "put_mvl_to_bit_slice" "force_mvl"
+            "force_mvl_list" "force_mvl_string" "force_mvl_to_bit_slice"
+            "has_mvl_value" "has_x" "has_z" "has_unknown"
+
+            "set_default_value" "set_default_mvl_value" "string_to_mvl" "mvl_to_string"
+            "mvl_to_int" "int_to_mvl" "mvl_to_bits" "bits_to_mvl" "mvl_to_mvl4"
+            "convert_mvl_list_to_mvl4_list" "mvl_list_to_mvl4_list" "string_to_mvl4"
+
+            "disable" "enable" "get" "put" "nb_get" "nb_put" "nb_insert" "nb_remove"
+            "nb_peek" "nb_top" "is_full" "clear_buffer" "number_of_elements"
+            "number_of_free_elements"
+            ;; "top" "is_empty"
+
+            "connect_pointers" "connect_ports" "check_generation" "do_bind" "do_bind_unit"
+            "connect" "remap_hdl_path" "disconnect" "disconnect_bound_set" "get_bound_set"
+            "is_connected" "get_hdl_size" "get_hdl_path_size" "path_exists"
+            "remap_external_uvm_path"
+
+            "b_transport" "nb_transport_fw" "nb_transport_bw"
+            "transport_dbg" "set_bus_width" "get_bus_width"
             ))
          "\\)"
          "[ \t]*(") ;; NOTE: it's possible to also add \n to the separators
@@ -2391,9 +2464,9 @@ See also `specman-font-lock-extra-types'.")
         (append specman-font-lock-keywords
                 (list
                  ;; Additionally fontify pre-defined functions
-                 ;; - using keep to prevent bold highlight in comments
+                 ;; - using prepend to override keywords of same name
                  (cons specman-function-keywords
-                       '(1 'font-lock-function-name-face keep))
+                       '(1 font-lock-builtin-face prepend))
                  )))
 
   (setq specman-font-lock-keywords-2
