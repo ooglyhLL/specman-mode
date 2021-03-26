@@ -2478,6 +2478,9 @@ See also `specman-font-lock-extra-types'.")
                  ;; Fontify user defined variables
                  (cons specman-variable-definition-regexp-full
                        '(1 'font-lock-variable-name-face prepend))
+                 ;; Fontify enumerated scalar type definitions
+                 (cons specman-type-definition-regexp-full
+                       '(1 'font-lock-type-face))
                  ;; Fontify user defined fields (and more)
                  ;; - not using regexp-full so method arguments
                  ;;   and type definitions are also highlighted
