@@ -2207,12 +2207,6 @@ See also `specman-font-lock-extra-types'.")
             "routine" "type" "method_type" "var" "attribute"
 
             
-            ;; packing keywords
-            ;; ----------------
-            "packing.low" "packing.low_big_endian" "packing.high"
-            "packing.high_big_endian" "packing.network" "packing.global_default" 
-            
-
             ;; logic keywords
             ;; --------------
             "and" "or" "xor" "not"
@@ -2402,6 +2396,14 @@ See also `specman-font-lock-extra-types'.")
          ;; Fontify all constants
          (cons specman-constant-keywords
                '(0 'font-lock-constant-face append))
+         ;; Fontify Verilog-style defines
+         (cons "`\\sw+" '(0 font-lock-constant-face))
+         ;; Pack options are effectively constants, too
+         (list "\\<\\(packing\\)\\>\\." '(1 font-lock-keyword-face append)
+               (list (regexp-opt '("low" "low_big_endian"
+                                   "high" "high_big_endian"
+                                   "network" "global_default") 'words)
+                     nil nil '(0 font-lock-constant-face append)))
          ;; Fontify macros
          (cons (concat
                 "#"
@@ -2533,7 +2535,7 @@ See also `specman-font-lock-extra-types'.")
                  ;; Fontify events as constants
                  (cons "@\\([a-zA-Z0-9_.]+\\)"
                        '(1 'font-lock-constant-face append))
-                 
+
                  ;; Fontify macro keywords as constants
                  (cons specman-macro-keywords
                        ;;'(0 'font-lock-constant-face append))
