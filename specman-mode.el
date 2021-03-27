@@ -317,8 +317,8 @@ format (e.g. 09/17/1997) is not supported."
 (defconst specman-number-regexp
   (concat
    "\\("
-   specman-symbol-begin-regexp
    "\\(?:"
+   specman-symbol-begin-regexp
    "\\(?:"
    "0b[01_]+" ;; unsized binary
    "\\|"
@@ -333,16 +333,16 @@ format (e.g. 09/17/1997) is not supported."
    "[0-9]+'[xXhH][0-9a-fA-FhHlLnNuUwWxXzZ_]+" ;; sized hexadecimal (incl MVL)
    "\\|"
    "[0-9]+'[dD][0-9][0-9_]*" ;; sized decimal
-   "\\|"
-   "-?[0-9_]+\\(?:\\.[0-9_]+\\)?\\(?:[eE][+-]?[0-9]+\\)?" ; real
-   "\\|"
-   "-?[0-9_]+[kKmM]?" ;; unsized decimal (last, so it won't hide other literals)
    "\\)"
    specman-symbol-end-regexp
    "\\)"
    "\\|"
+   "-?" specman-symbol-begin-regexp "[0-9_]+\\(?:\\.[0-9_]+\\)?\\(?:[eE][+-]?[0-9]+\\)?" ; real
+   "\\|"
+   "-?" specman-symbol-begin-regexp "[0-9_]+[kKmM]?" ;; unsized decimal (last, so it won't hide other literals)
+   "\\|"
    ;; match literal character (printable ASCII plus a few escape seqs)
-   "0c\"\\(?:[ -Z^-~]\\|[][]\\|\\\\[fntr\\\"]\\)\""
+   specman-symbol-begin-regexp "0c\"\\(?:[ -Z^-~]\\|[][]\\|\\\\[fntr\\\"]\\)\""
    "\\)"
    )
   "Regexp that identifies numbers (arg1)")
