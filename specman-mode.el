@@ -1734,6 +1734,23 @@ See also `specman-font-lock-extra-types'.")
             ;; type constants
             ;; --------------
             "TRUE" "FALSE" "UNDEF" "NULL" "MAX_INT" "MIN_INT" "MAX_UINT"
+            "MAX_LONGINT" "MIN_LONGINT" "MAX_LONGUINT" "MIN_LONGUINT"
+
+            ;; MVL literals
+            ;; ------------
+            "MVL_U" "MVL_X" "MVL_0" "MVL_1" "MVL_Z" "MVL_W" "MVL_L"
+            "MVL_H" "MVL_N"
+
+            ;; mathematical constants
+            ;; ----------------------
+            "SN_M_E" "SN_M_LOG2E" "SN_M_LOG10E" "SN_M_LN2" "SN_M_LN10"
+            "SN_M_PI" "SN_M_TWO_PI" "SN_M_PI_2" "SN_M_PI_4" "SN_M_1_PI"
+            "SN_M_2_PI" "SN_M_2_SQRTPI" "SN_M_SQRT2" "SN_M_SQRT1_2"
+
+            ;; physical constants
+            ;; ------------------
+            "SN_P_Q" "SN_P_C" "SN_P_K" "SN_P_H" "SN_P_EPS0" "SN_P_U0"
+            "SN_P_CELSIUS0"
 
             ;; error constants
             ;; ---------------
