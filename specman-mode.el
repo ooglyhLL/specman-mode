@@ -2221,7 +2221,7 @@ See also `specman-font-lock-extra-types'.")
             ;; handled seperately so they can have a different face for emphasis
             ;; "result" "return" "me" "it" "index" "prev"
 
-            "routine" "type" "method_type" "var" "attribute"
+            "routine" "type" "method_type" "var"
 
             
             ;; logic keywords
@@ -2272,8 +2272,6 @@ See also `specman-font-lock-extra-types'.")
             ;; port keywords
             ;; -------------
             ;; TODO: add cvl stuff
-            "deep_copy" "deep_compare" "deep_compare_physical" "deep_all"
-            "normal" "reference" "ignore"
             "external" "empty" "undefined"
             "force" "in" "out" "inout"
 
@@ -2450,6 +2448,15 @@ See also `specman-font-lock-extra-types'.")
          ;; named expect is optional. Anonymous expect handled via specman-keywords list.
          (cons "\\(expect\\)[ \t\n]+\\sw+[ \t\n]+\\(is\\)\\>"
                '((1 'font-lock-keyword-face append) (2 'font-lock-keyword-face append)))
+         ;; Field attributes
+         (list (concat "\\(attribute\\)[ \t\n]+"
+                       "\\(\\sw+\\)[ \t\n]+"
+                       "\\(deep_\\(?:copy\\|\\(?:compare\\(?:_physical\\)?\\)\\|all\\)\\)"
+                       "[ \t\n]*=[ \t\n]*"
+                       "\\(normal\\|reference\\|ignore\\)\\b")
+               '(1 font-lock-keyword-face t)
+               '(3 font-lock-keyword-face t)
+               '(4 font-lock-constant-face t))
          ;; Fontify all builtin keywords
          (cons specman-keywords
                '(0 'font-lock-keyword-face append))
