@@ -2272,7 +2272,6 @@ See also `specman-font-lock-extra-types'.")
             ;; port keywords
             ;; -------------
             ;; TODO: add cvl stuff
-            "external" "empty" "undefined"
             "force" "in" "out" "inout"
 
             ;; sequences keywords
@@ -2457,6 +2456,9 @@ See also `specman-font-lock-extra-types'.")
                '(1 font-lock-keyword-face t)
                '(3 font-lock-keyword-face t)
                '(4 font-lock-constant-face t))
+         ;; Port binding keywords (last parameter)
+         (cons ",[ \t\n]*\\(external\\|empty\\|undefined\\)[ \t\n]*)"
+               '(1 font-lock-constant-face))
          ;; Fontify all builtin keywords
          (cons specman-keywords
                '(0 'font-lock-keyword-face append))
