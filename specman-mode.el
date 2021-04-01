@@ -159,6 +159,13 @@ from templates."
   :group 'specman-mode
   )
 
+(defcustom specman-highlight-all-caps nil
+  "*ON (or non nil) means to highlight words in all-caps, commonly used
+for defines and enum members."
+  :group 'specman-mode
+  :type 'boolean
+  )
+
 (defcustom specman-highlight-punctuation t
   "*ON (or non nil) means to highlight punctuation symbols."
   :group 'specman-mode
@@ -2474,6 +2481,12 @@ See also `specman-font-lock-extra-types'.")
                    (cons "[][\.\,\;\:\*\|\&\!\(\)\{\}\=\$\<\>\'\#\%\-\+\@]"
                          '(0 'specman-punctuation-face append))))))
 
+  ;; Fontify all-caps identifiers (common convention for constants)
+  (when specman-highlight-all-caps
+    (setq specman-font-lock-keywords
+          (append specman-font-lock-keywords
+                  (list
+                   (cons "\\<[A-Z][A-Z0-9_]*" '(0 font-lock-constant-face))))))
 
   ;; Fontify comments
   ;; - '//' comments handled as syntax in both emacsen but '--' only in
