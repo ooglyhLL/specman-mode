@@ -233,7 +233,7 @@ format (e.g. 09/17/1997) is not supported."
   "e legal name")
 
 (defconst specman-method-definition-regexp
-  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*([^()]*\\(?:([^()]*)[^()]*\\)*)[^-/;]*?[ \t\n]+is\\(?:[a-z \t\n]*{\\|[ \t\n]+\\(?:empty\\|undefined\\);\\)"
+  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\(?:\\(?:final\\|static\\)[ \t\n]+\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*([^()]*\\(?:([^()]*)[^()]*\\)*)[^-/;]*?[ \t\n]+is\\(?:[a-z \t\n]*{\\|[ \t\n]+\\(?:empty\\|undefined\\);\\)"
   "Regexp that identifies methods (arg 1)")
 
 (defconst specman-on-event-method-definition-regexp
@@ -2220,6 +2220,8 @@ See also `specman-font-lock-extra-types'.")
             "struct" "extend" "unit" "interface" "when" "like" "implementing"
             ;; define/ifdef/etc' - handled differently
             "def_err"
+
+            "final"
             
             "print" "report"
 
