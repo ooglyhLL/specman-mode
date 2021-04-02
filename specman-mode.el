@@ -248,6 +248,8 @@ format (e.g. 09/17/1997) is not supported."
    "\\(?:extend[ \t\n]+[^{]+\\)"
    "\\|"
    "\\(?:\\(?:package[ \t\n]*\\)?unit[ \t\n]+[A-Za-z0-9_]+\\)"
+   "\\|"
+   "\\(?:interface[ \t\n]+[A-Za-z0-9_]+\\)"
    "\\)")
   "Regexp that identifies major class scopes (arg 1)")
 
@@ -2215,7 +2217,7 @@ See also `specman-font-lock-extra-types'.")
             "is" "a" "as" "computed" "with"
             "assert" "compute" "import" "new" "try"
 
-            "struct" "extend" "unit" "when" "like"
+            "struct" "extend" "unit" "interface" "when" "like" "implementing"
             ;; define/ifdef/etc' - handled differently
             "def_err"
             
