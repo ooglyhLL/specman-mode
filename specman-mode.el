@@ -240,17 +240,31 @@ format (e.g. 09/17/1997) is not supported."
   "\\(on[ \t\n]+[A-Za-z0-9_]+\\)[ \t\n]*{"
   "Regexp that identifies on-event methods (arg 1)")
 
+(defconst specman-subtype-determinant-regexp
+  "\\<\\(\\sw+\\)\\(?:'\\(\\sw+\\)\\)?\\>"
+  "Regexp that identifies a canonical subtype determinant in
+struct/unit definitions.")
+
+(defconst specman-struct-type-regexp
+  "\\<\\sw+\\>"
+  "Regexp that identifies type and optionally base-type of
+struct/unit definitions. Notice the third match group to identify
+the new starting point.")
+
+(defconst specman-class-end-of-name-regexp
+  "\\<like\\>\\|\\<implementing\\>\\|{"
+  "Regexp that identifies the trailing part of a class
+definition, following the class name."
+  )
+
 (defconst specman-class-definition-regexp
   (concat
-   "\\("
-   "\\(?:\\(?:package[ \t\n]*\\)?struct[ \t\n]+[A-Za-z0-9_]+\\)"
-   "\\|"
-   "\\(?:extend[ \t\n]+[^{]+\\)"
-   "\\|"
-   "\\(?:\\(?:package[ \t\n]*\\)?unit[ \t\n]+[A-Za-z0-9_]+\\)"
-   "\\|"
-   "\\(?:interface[ \t\n]+[A-Za-z0-9_]+\\)"
-   "\\)")
+   "\\(?:\\(?:package[ \t\n]*\\)?"
+   "\\(struct\\|unit\\|interface\\|extend\\)"
+   "[ \t\n]+[^{]*?\\(\\<\\sw+\\>\\)[ \t\n]*\\(?:"
+   specman-class-end-of-name-regexp
+   "\\)\\)"
+   )
   "Regexp that identifies major class scopes (arg 1)")
 
 (defconst specman-when-subtype-definition-regexp
@@ -2452,6 +2466,49 @@ See also `specman-font-lock-extra-types'.")
          ;; Fontify numbers
          (cons specman-number-regexp
                '(1 'font-lock-constant-face append))
+
+         ;; Struct/unit type and base type
+         (list specman-class-definition-regexp-full
+               ;; Struct/unit subtypes
+               (list specman-subtype-determinant-regexp
+                     '(progn
+                        (goto-char (match-end 1)) ;; move point to end of struct/unit keyword
+                        (match-beginning 2))      ;; return pos of struct/unit name
+                     nil
+                     '(1 font-lock-constant-face append)
+                     '(2 font-lock-variable-name-face append t))
+               ;; Struct/unit type
+               (list specman-struct-type-regexp
+                     '(progn
+                        (goto-char (match-beginning 2)) ;; move point to beginning of struct/unit name
+                        (save-excursion
+                          (when (re-search-forward
+                                 specman-class-end-of-name-regexp (point-at-eol) t)
+                            (match-beginning 0)))) ;; return search limit
+                     nil
+                     '(0 font-lock-type-face nil))
+               )
+         ;; Struct/unit base-type
+         (list "\\<like\\>"
+               (list "\\<\\sw+\\>"
+                     '(save-excursion
+                        (re-search-forward
+                         specman-class-end-of-name-regexp (point-at-eol) t)
+                        (match-beginning 0))
+                     nil
+                     '(0 font-lock-type-face nil)
+                     ))
+         ;; Struct/unit implemented interfaces
+         (list "\\<implementing\\>"
+               (list "\\<\\sw+\\>"
+                     '(save-excursion
+                        (re-search-forward
+                         specman-class-end-of-name-regexp (point-at-eol) t)
+                        (match-beginning 0))
+                     nil
+                     '(0 font-lock-type-face nil)
+                     ))
+
          ;; Fontify (named) check/expect
          (cons "\\(check\\)[ \t\n]+\\(?:\\sw+[ \t\n]+\\)?\\(that\\)"
                '((1 'font-lock-keyword-face append) (2 'font-lock-keyword-face append)))
