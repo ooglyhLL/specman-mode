@@ -4126,8 +4126,8 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
   (let ((beg (point)))
     (insert
      (if prefix
-         (replace-regexp-in-string "^" specman-default-line-comment-starter str)
-       str)
+         (replace-regexp-in-string "^[^\n]" specman-default-line-comment-starter str)
+       str))
     (let ((end (point-marker)))
       ;; Note that END position will change during loop execution as
       ;; lines are indented. Hence a marker, not just point.
@@ -4136,7 +4136,7 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
       (while (< (point) end)
         (indent-to col)
         (forward-line))
-      (goto-char end)))))
+      (goto-char end))))
 
 ;; -----------------------------------------------------------------------------
 ;;  Scope Queries
@@ -4399,8 +4399,8 @@ the struct/define name only, otherwise a full header with comments."
            (cond
             ((looking-at specman-class-definition-regexp-full)
              
-             (specman-prepared-buffer-substring (match-beginning 1)
-                                                (match-end 1))
+             (specman-prepared-buffer-substring (match-beginning 2)
+                                                (match-end 2))
              )
             ((looking-at specman-define-regexp-full)
              
