@@ -4149,7 +4149,8 @@ With KILL-EXISTING-END-COMMENT, first kill any existing labels."
       (while (< (point) end)
         (indent-to col)
         (forward-line))
-      (goto-char end))))
+      (goto-char end)
+      (indent-to col))))
 
 ;; -----------------------------------------------------------------------------
 ;;  Scope Queries
@@ -4297,6 +4298,7 @@ never less than 2 characters."
         )
     (when (<= cur-col
               (- specman-max-line-length 2))
+      (insert specman-default-line-comment-starter)
       (while (> counter 0)
         (progn
           (insert "-")
@@ -4318,12 +4320,11 @@ never less than 4 characters."
         )
     (when (<= cur-col
               (- specman-max-line-length 4))
-      (progn
-        (insert specman-default-line-comment-starter)
-        (while (> counter 0)
-          (insert "=")
-          (setq counter (- counter 1)))
-        (insert specman-default-line-comment-starter)))
+      (insert specman-default-line-comment-starter)
+      (while (> counter 0)
+        (insert "=")
+        (setq counter (- counter 1)))
+      (insert specman-default-line-comment-starter))
     (newline)
     (indent-to-left-margin)
     (indent-to cur-col)))
