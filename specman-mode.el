@@ -233,8 +233,21 @@ format (e.g. 09/17/1997) is not supported."
   "e legal name")
 
 (defconst specman-method-definition-regexp
-  "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?\\(?:\\(?:final\\|static\\)[ \t\n]+\\)?\\([A-Za-z0-9_]+\\)[ \t\n]*([^()]*\\(?:([^()]*)[^()]*\\)*)[^-/;]*?[ \t\n]+is\\(?:[a-z \t\n]*{\\|[ \t\n]+\\(?:empty\\|undefined\\);\\)"
-  "Regexp that identifies methods (arg 1)")
+  (concat
+   "\\(?:\\(?:private\\|package\\|protected\\)[ \t\n]+\\)?"
+   "\\(?:\\(?:final\\|static\\)[ \t\n]+\\)?"
+   "\\([A-Za-z0-9_]+\\)" ;; method name
+   "[ \t\n]*([^()]*\\(?:([^()]*)[^()]*\\)*)" ;; parameter list
+   "[^-/;]*?" ;; skip over optional return type
+   "\\(?:"
+   ";" ;; interface method
+   "\\|"
+   "\\<is\\>\\(?:\\(?:[ \t\n]+\\(?:also\\|only\\|first\\)\\)?[ \t\n]*{" ;; regular method
+   "\\|"
+   "[ \t\n]+\\(?:empty\\|undefined\\);\\)" ;; prototype/virtual
+   "\\)"
+   )
+  "Regexp that identifies methods definitions (arg 1)")
 
 (defconst specman-on-event-method-definition-regexp
   "\\(on[ \t\n]+[A-Za-z0-9_]+\\)[ \t\n]*{"
